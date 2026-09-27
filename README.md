@@ -14,7 +14,8 @@ Requiere Android 11 o superior.
 
    <img src="docs/qr.png" width="180" alt="Código QR para descargar Echoes.apk">
 
-2. Abre el archivo descargado. Android pedirá permiso para instalar apps de esa fuente
+2. Chrome avisa de que el archivo puede ser dañino (lo hace con cualquier APK): pulsa
+   **Descargar de todos modos**. Abre el archivo descargado. Android pedirá permiso para instalar apps de esa fuente
    (el navegador o la app de archivos). Actívalo y pulsa **Instalar**.
 3. Abre Echoes y permite el acceso a la música.
 
