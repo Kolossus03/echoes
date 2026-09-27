@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DragHandle
@@ -55,6 +56,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -75,6 +77,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import app.echoes.Graph
+import app.echoes.ui.components.LyricsView
 import app.echoes.SleepTimer
 import app.echoes.library.Library
 import app.echoes.library.Track
@@ -205,6 +208,7 @@ fun NowPlaying(lib: Library) {
     val pos = rememberPosition()
     val artScale by animateFloatAsState(if (ui.isPlaying) 1f else 0.86f, label = "art")
     var dx by remember { mutableFloatStateOf(0f) }
+    var showLyrics by rememberSaveable { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxSize()
@@ -218,8 +222,19 @@ fun NowPlaying(lib: Library) {
                 Text(if (flowOn) "FLOW" else "REPRODUCIENDO", style = MaterialTheme.typography.labelMedium, color = if (flowOn) Palette.pink else Color.White.copy(alpha = 0.7f))
                 Text(track.folder.trimEnd('/').substringAfterLast('/'), style = MaterialTheme.typography.titleSmall, maxLines = 1)
             }
+            IconButton(onClick = { showLyrics = !showLyrics }) {
+                Icon(Icons.Rounded.Lyrics, "Letra", tint = if (showLyrics) Color.White else Color.White.copy(alpha = 0.6f))
+            }
             IconButton(onClick = { nav.queueOpen = true }) { Icon(Icons.AutoMirrored.Rounded.QueueMusic, "Cola") }
         }
+        if (showLyrics) {
+            // Playback of a trimmed song starts after its leading silence; lyrics are timed from the file start.
+            val clipStart = if (trim && analysis != null && (analysis.introMs > 0 || analysis.outroMs > 0)) analysis.introMs else 0L
+            LyricsView(
+                track, pos + clipStart, accent, onSeek = { player.seekTo((it - clipStart).coerceAtLeast(0)) },
+                Modifier.weight(1.2f).fillMaxWidth(),
+            )
+        } else {
         Spacer(Modifier.weight(0.6f))
         Artwork(
             track,
@@ -234,6 +249,7 @@ fun NowPlaying(lib: Library) {
             corner = 18.dp, large = true,
         )
         Spacer(Modifier.weight(0.6f))
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(track.title, style = MaterialTheme.typography.headlineSmall, maxLines = 1, modifier = Modifier.basicMarquee())

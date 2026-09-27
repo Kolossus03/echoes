@@ -13,6 +13,7 @@ import app.echoes.flow.Taste
 import app.echoes.library.ArtLoader
 import app.echoes.library.Covers
 import app.echoes.library.LibraryRepository
+import app.echoes.lyrics.Lyrics
 import android.util.Log
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -43,6 +44,7 @@ object Graph {
     lateinit var art: ArtLoader; private set
     lateinit var covers: Covers; private set
     lateinit var downloads: Downloads; private set
+    lateinit var lyrics: Lyrics; private set
     lateinit var taste: StateFlow<Taste>; private set
     lateinit var favorites: StateFlow<Set<String>>; private set
 
@@ -63,6 +65,7 @@ object Graph {
         covers = Covers(app)
         art = ArtLoader(app, covers)
         downloads = Downloads(app, scope)
+        lyrics = Lyrics(app)
         taste = dao.recentPlays(50_000).map { Taste(it) }.stateIn(scope, SharingStarted.Eagerly, Taste(emptyList()))
         scope.launch {
             library.library.filterNotNull().map { it.tracks.size }.distinctUntilChanged().collect { analysis.schedule() }
