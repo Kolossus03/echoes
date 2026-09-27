@@ -1,0 +1,18 @@
+build/
+app/build/
+.gradle/
+.kotlin/
+.idea/
+.claude/
+.playwright-mcp/
+local.properties
+build.log
+*.apk
+
+# Private: never published
+BITACORA.md
+DESARROLLO.md
+tools/
+signing/
+personal.properties
+app/src/personal/

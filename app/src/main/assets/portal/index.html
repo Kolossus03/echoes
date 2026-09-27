@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Echoes Portal</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%230b0d10%27/%3E%3Ccircle cx=%2711%27 cy=%2716%27 r=%272.5%27 fill=%27%236cf0b0%27/%3E%3Cpath d=%27M15 11a7 7 0 0 1 0 10M19 7a12 12 0 0 1 0 18%27 stroke=%27%236cf0b0%27 stroke-width=%272.5%27 fill=%27none%27 stroke-linecap=%27round%27/%3E%3C/svg%3E">
+<style>
+@font-face { font-family: Grotesk; src: url(/space_grotesk.ttf); font-weight: 300 700; }
+:root {
+  --bg: #0b0d10; --surface: #14171c; --high: #1d2128; --line: #262b33;
+  --text: #f2f4f7; --muted: #8c94a3; --mint: #6cf0b0; --pink: #ff7ab6; --amber: #ffc46b;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+h1, h2, h3, .g { font-family: Grotesk, system-ui, sans-serif; letter-spacing: -0.02em; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input, select { font: inherit; color: var(--text); background: var(--high); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; outline: none; }
+input:focus, select:focus { border-color: var(--mint); }
+.app { display: grid; grid-template-columns: 250px 1fr; grid-template-rows: 1fr auto; height: 100vh; }
+aside { grid-row: 1; background: var(--surface); border-right: 1px solid var(--line); padding: 20px 12px; overflow-y: auto; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 10px 18px; }
+.brand h1 { font-size: 22px; margin: 0; }
+.brand span { color: var(--mint); }
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav button { text-align: left; padding: 9px 12px; border-radius: 10px; display: flex; justify-content: space-between; gap: 8px; color: var(--muted); }
+.nav button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav button:hover { background: var(--high); color: var(--text); }
+.nav button.on { background: var(--high); color: var(--text); }
+.nav small { color: var(--muted); }
+.label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 18px 12px 6px; }
+.upload-btn { margin: 14px 4px 0; width: calc(100% - 8px); padding: 14px; border: 1.5px dashed var(--line); border-radius: 14px; color: var(--muted); }
+.upload-btn:hover { border-color: var(--mint); color: var(--mint); }
+.yt { margin: 14px 4px 0; padding: 12px; background: var(--high); border-radius: 14px; display: flex; flex-direction: column; gap: 8px; }
+.yt b { font-size: 13px; }
+.yt input, .yt select { width: 100%; background: var(--bg); }
+.yt .primary { padding: 8px; }
+.yt .preview { font-size: 12px; color: var(--muted); }
+.jobs { margin: 8px 4px 0; display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.job { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.job .bar2 { height: 3px; background: var(--line); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.job .bar2 i { display: block; height: 100%; background: var(--mint); }
+.btns button.on { color: var(--mint); }
+main { grid-row: 1; overflow-y: auto; overflow-x: hidden; padding: 22px 28px 40px; }
+.top { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.top h2 { font-size: 30px; margin: 0; flex: 1; }
+.top input { width: 320px; }
+.sub { color: var(--muted); margin: -12px 0 18px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; padding: 8px; border-bottom: 1px solid var(--line); position: sticky; top: -22px; background: var(--bg); cursor: pointer; user-select: none; }
+td { padding: 6px 8px; border-bottom: 1px solid #16191e; vertical-align: middle; }
+tr:hover td { background: var(--surface); }
+tr.playing .t { color: var(--mint); }
+.song { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.song img, .song .ph { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex: none; background: linear-gradient(135deg, #2e6b57, #14231e); }
+.song div { min-width: 0; }
+.t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30vw; }
+.a { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30vw; }
+.lst { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+.num { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.energy { width: 70px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.energy i { display: block; height: 100%; background: linear-gradient(90deg, var(--mint), var(--pink)); border-radius: 3px; }
+.acts { white-space: nowrap; opacity: .35; }
+tr:hover .acts { opacity: 1; }
+.acts button { padding: 6px 7px; border-radius: 8px; color: var(--muted); }
+.acts button:hover { background: var(--high); color: var(--text); }
+.acts button.fav { color: var(--pink); }
+footer { grid-column: 1 / 3; background: var(--surface); border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 10px 20px; gap: 20px; }
+.np { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.np img { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; background: var(--high); }
+.ctrl { display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(46vw, 560px); }
+.btns { display: flex; align-items: center; gap: 18px; }
+.btns button { font-size: 18px; color: var(--muted); }
+.btns button:hover { color: var(--text); }
+.btns .play { width: 40px; height: 40px; border-radius: 50%; background: var(--text); color: var(--bg); font-size: 16px; }
+.bar { display: flex; align-items: center; gap: 10px; width: 100%; }
+.track { flex: 1; height: 5px; background: var(--line); border-radius: 3px; cursor: pointer; position: relative; }
+.track i { position: absolute; inset: 0 auto 0 0; background: var(--text); border-radius: 3px; }
+.track:hover i { background: var(--mint); }
+.side { display: flex; justify-content: flex-end; align-items: center; gap: 10px; color: var(--muted); }
+.chip { padding: 4px 10px; border-radius: 99px; background: var(--high); font-size: 12px; }
+.chip.flow { color: var(--pink); }
+.here { display: flex; align-items: center; gap: 8px; }
+.here audio { height: 32px; width: 240px; }
+.drop { position: fixed; inset: 0; background: rgba(11,13,16,.88); display: none; place-items: center; z-index: 10; }
+.drop.on { display: grid; }
+.drop div { border: 2px dashed var(--mint); border-radius: 24px; padding: 70px 90px; text-align: center; }
+.drop h2 { font-size: 34px; margin: 0 0 8px; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; place-items: center; z-index: 20; }
+.modal.on { display: grid; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 24px; width: min(520px, 92vw); }
+.card h3 { margin: 0 0 14px; font-size: 22px; }
+.card .row { display: flex; gap: 10px; margin: 10px 0; }
+.card .row > * { flex: 1; }
+.card .end { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.primary { background: var(--mint); color: var(--bg); padding: 10px 18px; border-radius: 99px; font-weight: 600; }
+.ghost { padding: 10px 18px; border-radius: 99px; color: var(--muted); }
+.files { max-height: 260px; overflow-y: auto; margin-top: 12px; }
+.file { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.file span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ok { color: var(--mint); } .skip { color: var(--amber); } .err { color: var(--pink); }
+.toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: var(--high); padding: 12px 20px; border-radius: 12px; display: none; z-index: 30; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px; }
+.stat { background: var(--surface); border-radius: 16px; padding: 18px; }
+.stat b { font-family: Grotesk; font-size: 30px; display: block; }
+.stat span { color: var(--muted); }
+.bars { display: flex; align-items: flex-end; gap: 6px; height: 120px; background: var(--surface); border-radius: 16px; padding: 16px; margin-bottom: 20px; }
+.bars i { flex: 1; background: var(--mint); border-radius: 4px 4px 0 0; min-height: 3px; opacity: .6; }
+.bars i:last-child { opacity: 1; }
+.ranks { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.ranks ol { background: var(--surface); border-radius: 16px; padding: 16px 16px 16px 40px; margin: 0; }
+.ranks li { padding: 4px 0; }
+.ranks li small { color: var(--muted); }
+.login { display: grid; place-items: center; height: 100vh; }
+.login .card { text-align: center; }
+.login input { font-size: 28px; letter-spacing: .3em; text-align: center; width: 220px; margin: 10px 0; font-family: monospace; }
+@media (max-width: 820px) { .app { grid-template-columns: 1fr; } aside { display: none; } footer { grid-column: 1; grid-template-columns: 1fr; } .side { display: none; } }
+</style>
+</head>
+<body>
+<div id="login" class="login" hidden>
+  <div class="card">
+    <h3 class="g">Echoes Portal</h3>
+    <p style="color:var(--muted)">Escribe el código que aparece en el móvil<br>(Ajustes → Portal).</p>
+    <input id="code" maxlength="6" autocomplete="off" autofocus>
+    <div class="end" style="justify-content:center"><button class="primary" id="enter">Entrar</button></div>
+  </div>
+</div>
+
+<div id="app" class="app" hidden>
+  <aside>
+    <div class="brand"><h1 class="g">Echoes <span>Portal</span></h1></div>
+    <div class="nav" id="nav"></div>
+    <div class="label">Listas</div>
+    <div class="nav" id="lists"></div>
+    <button class="upload-btn" id="pick">⇪ Subir música<br><small>o arrástrala a la ventana</small></button>
+    <input type="file" id="file" multiple accept="audio/*,.mp3,.m4a,.flac,.ogg,.opus,.wav,.csv" hidden>
+    <div class="yt">
+      <b>▶ Desde YouTube o Spotify</b>
+      <small style="color:var(--muted)">o suelta aquí un .csv de exportify.net</small>
+      <input id="ytUrl" placeholder="Pega un enlace (canción o playlist)">
+      <div class="preview" id="ytPreview"></div>
+      <select id="ytTarget"></select>
+      <input id="ytNew" placeholder="Nombre de la lista nueva">
+      <button class="primary" id="ytGo">Descargar al móvil</button>
+    </div>
+    <div class="jobs" id="jobs"></div>
+  </aside>
+  <main>
+    <div class="top"><h2 class="g" id="title">Todas</h2><input id="q" placeholder="Buscar canción, artista, álbum…"></div>
+    <div class="sub" id="subtitle"></div>
+    <div id="view"></div>
+  </main>
+  <footer>
+    <div class="np"><img id="npArt" alt=""><div style="min-width:0"><div class="t" id="npTitle">—</div><div class="a" id="npArtist">Nada sonando en el móvil</div></div></div>
+    <div class="ctrl">
+      <div class="btns">
+        <button title="Aleatorio" id="shuffleBtn" data-c="shuffle">⤮</button>
+        <button title="Anterior" data-c="prev">⏮</button>
+        <button class="play" id="toggle" data-c="toggle">▶</button>
+        <button title="Siguiente" data-c="next">⏭</button>
+        <button title="Flow desde esta canción" id="flowBtn">≋</button>
+      </div>
+      <div class="bar"><span class="num" id="pos">0:00</span><div class="track" id="seek"><i id="fill"></i></div><span class="num" id="dur">0:00</span></div>
+    </div>
+    <div class="side">
+      <span class="chip flow" id="flowChip" hidden>FLOW</span>
+      <span class="chip" id="sonic" hidden></span>
+      <div class="here" id="here" hidden><span>🎧 Aquí:</span><audio id="audio" controls></audio></div>
+    </div>
+  </footer>
+</div>
+
+<div class="drop" id="drop"><div><h2 class="g">Suelta para subir al móvil</h2><p style="color:var(--muted)">MP3, M4A, FLAC, OGG, WAV</p></div></div>
+
+<div class="modal" id="upModal"><div class="card">
+  <h3 class="g">Subir <span id="upCount"></span> al móvil</h3>
+  <div class="row"><select id="upTarget"></select></div>
+  <div class="row" id="upNewRow"><input id="upNew" placeholder="Nombre de la lista nueva"></div>
+  <div class="files" id="upFiles"></div>
+  <div class="end"><button class="ghost" id="upCancel">Cancelar</button><button class="primary" id="upGo">Subir</button></div>
+</div></div>
+
+<div class="modal" id="tagModal"><div class="card">
+  <h3 class="g">Arreglar etiquetas</h3>
+  <p style="color:var(--muted);margin-top:-6px">Cambia cómo se ve en Echoes; el archivo no se toca.</p>
+  <div class="row"><input id="tTitle" placeholder="Título"></div>
+  <div class="row"><input id="tArtist" placeholder="Artista"></div>
+  <div class="row"><input id="tAlbum" placeholder="Álbum"></div>
+  <div class="end"><button class="ghost" id="tCancel">Cancelar</button><button class="primary" id="tSave">Guardar</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let key = localStorage.getItem('echoes-key') || '';
+let lib = { tracks: [], folders: [] };
+let byId = new Map();
+let view = { kind: 'all', folder: null };
+let sort = { col: null, dir: 1 };
+let state = null;
+let editing = null;
+let pending = [];
+
+const fmt = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const fmtLong = (ms) => { const m = Math.round(ms / 60000); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+const fold = (s) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const art = (id, big) => `/api/art/${id}?k=${key}${big ? '&big=1' : ''}`;
+
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3200); }
+
+async function api(path, body) {
+  const res = await fetch('/api' + path, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { 'X-Echoes-Key': key, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (res.status === 401) { showLogin(); throw new Error('auth'); }
+  if (!res.ok) throw new Error(await res.text());
+  return res.status === 204 ? null : res.json();
+}
+
+function showLogin() { $('app').hidden = true; $('login').hidden = false; $('code').focus(); }
+$('enter').onclick = async () => { key = $('code').value.trim().toLowerCase(); localStorage.setItem('echoes-key', key); start(); };
+$('code').onkeydown = (e) => { if (e.key === 'Enter') $('enter').click(); };
+
+async function start() {
+  try { await loadLibrary(); } catch (e) { if (e.message !== 'auth') setTimeout(start, 1500); return; }
+  $('login').hidden = true; $('app').hidden = false;
+  poll();
+  pollJobs();
+}
+
+async function loadLibrary() {
+  lib = await api('/library');
+  byId = new Map(lib.tracks.map((t) => [t.id, t]));
+  renderNav();
+  render();
+}
+
+function renderTargets() {
+  const keep = $('ytTarget').value;
+  $('ytTarget').innerHTML = '<option value="">+ Lista nueva…</option>' + lib.folders.map((f) => `<option value="${esc(f.relPath)}">${esc(f.name)}</option>`).join('');
+  if ([...$('ytTarget').options].some((o) => o.value === keep)) $('ytTarget').value = keep;
+  $('ytNew').hidden = $('ytTarget').value !== '';
+}
+
+function renderNav() {
+  renderTargets();
+  const items = [['all', 'Todas', lib.tracks.length], ['favs', 'Favoritas', lib.tracks.filter((t) => t.fav).length], ['insights', 'Tu escucha', '']];
+  $('nav').innerHTML = items.map(([k, n, c]) => `<button data-k="${k}" class="${view.kind === k ? 'on' : ''}">${n}<small>${c}</small></button>`).join('');
+  $('lists').innerHTML = lib.folders.map((f) => `<button data-f="${esc(f.relPath)}" class="${view.folder === f.relPath ? 'on' : ''}"><span>${esc(f.name)}</span><small>${f.count}</small></button>`).join('');
+}
+$('nav').onclick = (e) => { const b = e.target.closest('button'); if (b) { view = { kind: b.dataset.k, folder: null }; renderNav(); render(); } };
+$('lists').onclick = (e) => { const b = e.target.closest('button'); if (b) { view = { kind: 'folder', folder: b.dataset.f }; renderNav(); render(); } };
+$('q').oninput = () => render();
+
+function visible() {
+  let list = lib.tracks;
+  if (view.kind === 'favs') list = list.filter((t) => t.fav);
+  if (view.kind === 'folder') list = list.filter((t) => t.folder === view.folder);
+  const words = fold($('q').value).split(/\s+/).filter(Boolean);
+  if (words.length) list = list.filter((t) => { const k = fold(`${t.title} ${t.artist} ${t.album} ${t.folderName}`); return words.every((w) => k.includes(w)); });
+  if (sort.col) {
+    const get = { title: (t) => fold(t.title), artist: (t) => fold(t.artist), dur: (t) => t.durationMs, bpm: (t) => t.bpm || 0, energy: (t) => t.energy ?? -1, added: (t) => t.addedAt, plays: (t) => t.plays }[sort.col];
+    list = [...list].sort((a, b) => (get(a) > get(b) ? 1 : get(a) < get(b) ? -1 : 0) * sort.dir);
+  }
+  return list;
+}
+
+function render() {
+  if (view.kind === 'insights') return renderInsights();
+  const list = visible();
+  const folder = lib.folders.find((f) => f.relPath === view.folder);
+  $('title').textContent = view.kind === 'folder' ? folder?.name ?? '' : view.kind === 'favs' ? 'Favoritas' : 'Todas';
+  $('subtitle').innerHTML = `${list.length} canciones · ${fmtLong(list.reduce((s, t) => s + t.durationMs, 0))} &nbsp; <button class="chip" id="playAll">▶ Reproducir en el móvil</button> <button class="chip" id="shuffleAll">⤮ Aleatorio</button>`;
+  const cur = state?.current?.id;
+  const head = [['title', 'Canción'], ['artist', 'Lista'], ['bpm', 'BPM'], ['energy', 'Energía'], ['plays', 'Escuchas'], ['dur', '⏱']]
+    .map(([c, n]) => `<th data-s="${c}">${n}${sort.col === c ? (sort.dir > 0 ? ' ↑' : ' ↓') : ''}</th>`).join('');
+  $('view').innerHTML = `<table><thead><tr>${head}<th></th></tr></thead><tbody>${list.map((t) => `
+    <tr data-id="${t.id}" class="${t.id === cur ? 'playing' : ''}">
+      <td><div class="song"><img loading="lazy" src="${art(t.id)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph'}))"><div><div class="t">${esc(t.title)}</div><div class="a">${esc(t.artist)} · ${esc(t.album)}</div></div></div></td>
+      <td class="num lst">${esc(t.folderName)}</td>
+      <td class="num">${t.bpm ? Math.round(t.bpm) : '—'}</td>
+      <td>${t.energy != null ? `<div class="energy" title="${Math.round(t.energy * 100)}%"><i style="width:${Math.round(t.energy * 100)}%"></i></div>` : '<span class="num">—</span>'}</td>
+      <td class="num">${t.plays || ''}</td>
+      <td class="num">${fmt(t.durationMs)}</td>
+      <td class="acts">
+        <button data-a="play" title="Reproducir en el móvil">▶</button>
+        <button data-a="flow" title="Flow desde aquí">≋</button>
+        <button data-a="next" title="Poner a continuación">⤴</button>
+        <button data-a="here" title="Escuchar en este PC">🎧</button>
+        <button data-a="fav" class="${t.fav ? 'fav' : ''}" title="Favorita">${t.fav ? '♥' : '♡'}</button>
+        <button data-a="tags" title="Arreglar etiquetas">✎</button>
+        <a href="/api/audio/${t.id}?k=${key}&download=1"><button title="Descargar">⬇</button></a>
+      </td>
+    </tr>`).join('')}</tbody></table>`;
+  $('playAll').onclick = () => api('/play', { ids: list.map((t) => t.id), start: 0 });
+  $('shuffleAll').onclick = () => api('/play', { ids: list.map((t) => t.id), shuffle: true });
+}
+
+$('view').onclick = async (e) => {
+  const th = e.target.closest('th[data-s]');
+  if (th) { sort = sort.col === th.dataset.s ? { col: th.dataset.s, dir: -sort.dir } : { col: th.dataset.s, dir: 1 }; return render(); }
+  const b = e.target.closest('button[data-a]');
+  const row = e.target.closest('tr[data-id]');
+  if (!b || !row) return;
+  const id = Number(row.dataset.id);
+  const t = byId.get(id);
+  switch (b.dataset.a) {
+    case 'play': { const list = visible(); await api('/play', { ids: list.map((x) => x.id), start: list.indexOf(t) }); break; }
+    case 'flow': await api('/flow', { id }); toast(`Flow desde «${t.title}»`); break;
+    case 'next': await api('/queue', { id, mode: 'next' }); toast('Suena a continuación'); break;
+    case 'here': $('here').hidden = false; $('audio').src = `/api/audio/${id}?k=${key}`; $('audio').play(); break;
+    case 'fav': await api('/fav', { id }); t.fav = !t.fav; render(); break;
+    case 'tags': editing = t; $('tTitle').value = t.title; $('tArtist').value = t.artist; $('tAlbum').value = t.album; $('tagModal').classList.add('on'); break;
+  }
+  setTimeout(poll, 300);
+};
+
+$('tCancel').onclick = () => $('tagModal').classList.remove('on');
+$('tSave').onclick = async () => {
+  await api('/tags', { id: editing.id, title: $('tTitle').value, artist: $('tArtist').value, album: $('tAlbum').value });
+  $('tagModal').classList.remove('on');
+  toast('Etiquetas guardadas');
+  setTimeout(loadLibrary, 600);
+};
+
+async function renderInsights() {
+  $('title').textContent = 'Tu escucha';
+  $('subtitle').textContent = 'Últimos 30 días';
+  const i = await api('/insights');
+  const max = Math.max(1, ...i.daily);
+  $('view').innerHTML = `
+    <div class="stats">
+      <div class="stat"><b>${fmtLong(i.minutes * 60000)}</b><span>escuchado</span></div>
+      <div class="stat"><b>${i.plays}</b><span>canciones enteras</span></div>
+      <div class="stat"><b>${i.streak} días</b><span>de racha</span></div>
+    </div>
+    <h3 class="g">Minutos al día</h3>
+    <div class="bars">${i.daily.map((m) => `<i style="height:${(m / max) * 100}%" title="${m} min"></i>`).join('')}</div>
+    ${i.avgBpm ? `<p>Tu sonido: unos <b>${Math.round(i.avgBpm)} BPM</b> y un <b>${Math.round(i.avgEnergy * 100)}%</b> de energía media.</p>` : ''}
+    <div class="ranks">
+      <div><h3 class="g">Canciones</h3><ol>${i.topTracks.map((r) => `<li>${esc(r.label)} <small>${esc(r.sub)} · ${r.minutes} min</small></li>`).join('') || '<li><small>Aún nada</small></li>'}</ol></div>
+      <div><h3 class="g">Artistas</h3><ol>${i.topArtists.map((r) => `<li>${esc(r.label)} <small>${r.minutes} min</small></li>`).join('') || '<li><small>Aún nada</small></li>'}</ol></div>
+    </div>`;
+}
+
+document.querySelectorAll('[data-c]').forEach((b) => b.onclick = async () => { await api('/control', { action: b.dataset.c }); poll(); });
+$('flowBtn').onclick = async () => { if (state?.current) { await api('/flow', { id: state.current.id }); toast('Flow activado'); } };
+$('seek').onclick = async (e) => {
+  if (!state?.durationMs) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  await api('/control', { action: 'seek', value: Math.round(((e.clientX - r.left) / r.width) * state.durationMs) });
+  poll();
+};
+
+let lastId = null;
+async function poll() {
+  clearTimeout(poll._h);
+  try {
+    state = await api('/state');
+    const c = state.current;
+    $('toggle').textContent = state.isPlaying ? '❚❚' : '▶';
+    $('npTitle').textContent = c ? c.title : '—';
+    $('npArtist').textContent = c ? `${c.artist} · ${c.folderName}` : 'Nada sonando en el móvil';
+    $('pos').textContent = fmt(state.positionMs);
+    $('dur').textContent = fmt(state.durationMs);
+    $('fill').style.width = `${state.durationMs ? (state.positionMs / state.durationMs) * 100 : 0}%`;
+    $('flowChip').hidden = !state.flow;
+    $('shuffleBtn').classList.toggle('on', state.shuffle);
+    $('sonic').hidden = !c?.bpm;
+    if (c?.bpm) $('sonic').textContent = `${Math.round(c.bpm)} BPM · ${Math.round(c.energy * 100)}% energía`;
+    if (c && c.id !== lastId) {
+      lastId = c.id;
+      $('npArt').src = art(c.id, true);
+      if (view.kind !== 'insights') document.querySelectorAll('tr.playing').forEach((r) => r.classList.remove('playing'));
+      document.querySelector(`tr[data-id="${c.id}"]`)?.classList.add('playing');
+      document.title = `${c.title} · Echoes`;
+    }
+  } catch {}
+  poll._h = setTimeout(poll, 1000);
+}
+
+let pendingCsv = null;
+async function openCsv(file) {
+  const csv = await file.text();
+  $('ytUrl').value = '';
+  $('ytPreview').textContent = 'Leyendo archivo…';
+  try {
+    const r = await api('/csv', { name: file.name, csv });
+    pendingCsv = { name: file.name, csv };
+    $('ytPreview').textContent = `Archivo «${r.playlist}» · ${r.videos.length} canciones`;
+    if (!$('ytTarget').value && !$('ytNew').value) $('ytNew').value = r.playlist;
+  } catch (e) { pendingCsv = null; $('ytPreview').textContent = 'No se pudo leer: ' + e.message; }
+}
+
+function openUpload(files) {
+  const csv = [...files].find((f) => /\.csv$/i.test(f.name));
+  if (csv) return openCsv(csv);
+  pending = [...files].filter((f) => /\.(mp3|m4a|aac|flac|ogg|opus|wav)$/i.test(f.name));
+  if (!pending.length) return toast('Solo archivos de audio');
+  $('upCount').textContent = pending.length === 1 ? '1 canción' : `${pending.length} canciones`;
+  const current = view.kind === 'folder' ? view.folder : '';
+  $('upTarget').innerHTML = lib.folders.map((f) => `<option value="${esc(f.relPath)}" ${f.relPath === current ? 'selected' : ''}>${esc(f.name)}</option>`).join('') + '<option value="">+ Lista nueva…</option>';
+  if (!current && lib.folders.length) $('upTarget').value = '';
+  $('upNewRow').hidden = $('upTarget').value !== '';
+  $('upFiles').innerHTML = pending.map((f, i) => `<div class="file"><span>${esc(f.name)}</span><span id="st${i}" class="num">${(f.size / 1048576).toFixed(1)} MB</span></div>`).join('');
+  $('upGo').disabled = false;
+  $('upModal').classList.add('on');
+}
+$('upTarget').onchange = () => { $('upNewRow').hidden = $('upTarget').value !== ''; };
+$('upCancel').onclick = () => $('upModal').classList.remove('on');
+$('pick').onclick = () => $('file').click();
+$('file').onchange = () => { openUpload($('file').files); $('file').value = ''; };
+
+function send(file, folder, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', `/api/upload?folder=${encodeURIComponent(folder)}`);
+    x.setRequestHeader('X-Echoes-Key', key);
+    x.upload.onprogress = (e) => onProgress(e.loaded / e.total);
+    x.onload = () => x.status === 200 ? resolve(JSON.parse(x.responseText)) : reject(new Error(x.responseText));
+    x.onerror = () => reject(new Error('red'));
+    const fd = new FormData();
+    fd.append('file', file, file.name);
+    x.send(fd);
+  });
+}
+
+$('upGo').onclick = async () => {
+  const folder = $('upTarget').value || $('upNew').value.trim();
+  if (!folder) return toast('Pon un nombre a la lista');
+  $('upGo').disabled = true;
+  let saved = 0, skipped = 0, failed = 0;
+  for (let i = 0; i < pending.length; i++) {
+    const st = $('st' + i);
+    try {
+      const r = await send(pending[i], folder, (p) => st.textContent = `${Math.round(p * 100)}%`);
+      if (r.saved.length) { saved++; st.textContent = '✓'; st.className = 'ok'; }
+      else if (r.skipped.length) { skipped++; st.textContent = 'ya estaba'; st.className = 'skip'; }
+      else { failed++; st.textContent = 'error'; st.className = 'err'; }
+    } catch { failed++; st.textContent = 'error'; st.className = 'err'; }
+  }
+  toast(`${saved} subidas${skipped ? `, ${skipped} ya estaban` : ''}${failed ? `, ${failed} con error` : ''}`);
+  setTimeout(() => $('upModal').classList.remove('on'), 1200);
+  setTimeout(loadLibrary, 2500);
+};
+
+let resolveTimer = null;
+$('ytTarget').onchange = () => { $('ytNew').hidden = $('ytTarget').value !== ''; };
+$('ytUrl').oninput = () => {
+  pendingCsv = null;
+  clearTimeout(resolveTimer);
+  const url = $('ytUrl').value.trim();
+  $('ytPreview').textContent = '';
+  if (!/youtu\.?be|open\.spotify\.com/.test(url)) return;
+  $('ytPreview').textContent = 'Leyendo enlace…';
+  resolveTimer = setTimeout(async () => {
+    try {
+      const r = await api('/resolve', { url });
+      $('ytPreview').textContent = r.playlist
+        ? `${r.origin} «${r.playlist}» · ${r.videos.length} canciones${r.truncated ? ' (Spotify solo deja ver 100)' : ''} · se vincula para sincronizar`
+        : `${r.videos[0].title} · ${r.videos[0].uploader} · ${fmt(r.videos[0].durationSec * 1000)}`;
+      if (r.playlist && !$('ytTarget').value && !$('ytNew').value) $('ytNew').value = r.playlist;
+    } catch (e) { $('ytPreview').textContent = 'No se pudo leer: ' + e.message; }
+  }, 400);
+};
+$('ytGo').onclick = async () => {
+  const url = $('ytUrl').value.trim();
+  const folder = $('ytTarget').value || $('ytNew').value.trim();
+  if (!url && pendingCsv) {
+    if (!folder) return toast('Elige una lista o ponle nombre a la nueva');
+    const r = await api('/csv', { ...pendingCsv, folder, go: true });
+    toast(`Descargando ${r.videos.length} canciones…`);
+    pendingCsv = null; $('ytPreview').textContent = '';
+    return pollJobs();
+  }
+  if (!url) return toast('Pega un enlace de YouTube o Spotify');
+  if (!folder) return toast('Elige una lista o ponle nombre a la nueva');
+  $('ytGo').disabled = true;
+  try {
+    const r = await api('/download', { url, folder });
+    toast(r.videos.length === 1 ? 'Descargando en el móvil…' : `Descargando ${r.videos.length} canciones…`);
+    $('ytUrl').value = ''; $('ytPreview').textContent = '';
+    pollJobs();
+  } catch (e) { toast('No se pudo: ' + e.message); }
+  $('ytGo').disabled = false;
+};
+
+const jobText = { waiting: 'En cola', working: 'Descargando', done: '✓ Lista', skipped: 'Ya la tenías', failed: 'Error' };
+let jobsWereActive = false;
+async function pollJobs() {
+  clearTimeout(pollJobs._h);
+  let jobs = [];
+  try { jobs = await api('/downloads'); } catch {}
+  $('jobs').innerHTML = jobs.slice(-6).reverse().map((j) => `<div class="job"><div class="t" style="max-width:200px">${esc(j.title)}</div>
+    <div class="${j.state === 'failed' ? 'err' : j.state === 'skipped' ? 'skip' : j.state === 'done' ? 'ok' : 'num'}">${j.message ? esc(j.message) : jobText[j.state]}</div>
+    ${j.state === 'working' ? `<div class="bar2"><i style="width:${Math.round((j.progress ?? 0) * 100)}%"></i></div>` : ''}</div>`).join('');
+  const active = jobs.some((j) => j.state === 'waiting' || j.state === 'working');
+  if (jobsWereActive && !active) setTimeout(loadLibrary, 2000);
+  jobsWereActive = active;
+  if (active) pollJobs._h = setTimeout(pollJobs, 1500);
+}
+
+let dragDepth = 0;
+window.addEventListener('dragenter', (e) => { if (e.dataTransfer.types.includes('Files')) { dragDepth++; $('drop').classList.add('on'); } });
+window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; $('drop').classList.remove('on'); } });
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => { e.preventDefault(); dragDepth = 0; $('drop').classList.remove('on'); if (e.dataTransfer.files.length) openUpload(e.dataTransfer.files); });
+window.addEventListener('keydown', (e) => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); api('/control', { action: 'toggle' }).then(poll); } });
+
+if (key) start(); else showLogin();
+</script>
+</body>
+</html>

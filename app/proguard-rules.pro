@@ -1,0 +1,17 @@
+-dontwarn java.lang.management.**
+-dontwarn javax.management.**
+-dontwarn org.slf4j.**
+-dontwarn io.netty.**
+-dontwarn reactor.blockhound.**
+-dontwarn com.typesafe.config.**
+-keep class io.ktor.server.cio.** { *; }
+-keep class io.ktor.server.engine.** { *; }
+-keep class kotlinx.coroutines.internal.MainDispatcherFactory { *; }
+-keep class kotlinx.coroutines.android.AndroidDispatcherFactory { *; }
+-keepclassmembers class app.echoes.portal.** { *; }
+-keep class org.mozilla.javascript.** { *; }
+-keep class org.mozilla.classfile.ClassFileWriter
+-dontwarn org.mozilla.javascript.tools.**
+-dontwarn java.beans.**
+-dontwarn javax.script.**
+-dontwarn jdk.dynalink.**
