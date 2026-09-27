@@ -20,7 +20,7 @@ data class Track(
     val trackNo: Int,
     val year: Int,
 ) {
-    val fingerprint get() = "a2:$size:$modified"
+    val fingerprint get() = "a3:$size:$modified"
     val mediaId get() = id.toString()
     val searchKey: String by lazy { fold("$title $artist $album ${folder.trimEnd('/').substringAfterLast('/')}") }
 }

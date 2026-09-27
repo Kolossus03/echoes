@@ -59,6 +59,8 @@
             </intent-filter>
         </service>
 
+        <receiver android:name=".ui.Shortcut$Pinned" android:exported="false" />
+
         <service
             android:name=".download.DownloadService"
             android:exported="false"

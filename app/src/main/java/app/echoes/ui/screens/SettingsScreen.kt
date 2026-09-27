@@ -1,6 +1,22 @@
 package app.echoes.ui.screens
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.background
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.res.stringResource
+import app.echoes.R
+import app.echoes.ui.Shortcut
+import app.echoes.ui.components.CollectionArt
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -93,6 +109,10 @@ fun SettingsScreen(lib: Library) {
                 }
             }
         }
+        if (Shortcut.supported(context)) {
+            item { SectionTitle("Icono y nombre") }
+            item { ShortcutCard() }
+        }
         item { SectionTitle("Sonido") }
         item {
             Toggle(
@@ -130,6 +150,72 @@ fun SettingsScreen(lib: Library) {
                     colors = SwitchDefaults.colors(checkedTrackColor = Palette.mint, checkedThumbColor = Palette.bg),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ShortcutCard() {
+    val context = LocalContext.current
+    val actions = LocalActions.current
+    val default = stringResource(R.string.app_name)
+    var name by remember { mutableStateOf(Graph.prefs.shortcutName ?: default) }
+    var waiting by remember { mutableStateOf(0L) }
+    var blocked by remember { mutableStateOf(false) }
+    val confirmed by Shortcut.confirmed.collectAsState()
+    LaunchedEffect(waiting, confirmed) {
+        if (waiting == 0L) return@LaunchedEffect
+        if (confirmed >= waiting) { waiting = 0L; actions.toast("Acceso directo añadido"); return@LaunchedEffect }
+        delay(6_000)
+        blocked = true
+        waiting = 0L
+    }
+    if (blocked) {
+        AlertDialog(
+            onDismissRequest = { blocked = false },
+            containerColor = Palette.surfaceHigh,
+            title = { Text("No ha aparecido el acceso directo") },
+            text = {
+                Text(
+                    "Si no has visto ningún aviso, el móvil lo está bloqueando. En Xiaomi: Información de la app → Otros permisos → " +
+                        "«Accesos directos de la pantalla de inicio» → Permitir. Luego vuelve a pulsar «Añadir a inicio».",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    blocked = false
+                    context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
+                }) { Text("Abrir ajustes de la app") }
+            },
+            dismissButton = { TextButton(onClick = { blocked = false }) { Text("Cerrar") } },
+        )
+    }
+    Column(Modifier.padding(horizontal = 20.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Palette.surface).padding(16.dp)) {
+        Text(
+            "Android no deja cambiar el icono de una app instalada, pero sí crear un acceso directo con el nombre y la imagen que " +
+                "quieras. Luego puedes quitar el icono original de la pantalla de inicio; seguirá en el cajón de apps.",
+            color = Palette.muted, style = MaterialTheme.typography.bodySmall,
+        )
+        Spacer(Modifier.height(14.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CollectionArt(
+                Shortcut.COVER_KEY, emptyList(),
+                Modifier.size(64.dp).clickable { actions.pickCover(Shortcut.COVER_KEY) }, corner = 16.dp,
+            )
+            Spacer(Modifier.width(14.dp))
+            OutlinedTextField(name, { name = it }, label = { Text("Nombre") }, singleLine = true, modifier = Modifier.weight(1f))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { actions.pickCover(Shortcut.COVER_KEY) }) { Text("Elegir imagen") }
+            Spacer(Modifier.weight(1f))
+            Button(
+                enabled = name.isNotBlank(),
+                onClick = {
+                    Graph.prefs.shortcutName = name.trim()
+                    if (Shortcut.pin(context, name.trim())) actions.toast("Acceso directo actualizado") else waiting = System.currentTimeMillis()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Palette.mint, contentColor = Palette.bg),
+            ) { Text("Añadir a inicio") }
         }
     }
 }

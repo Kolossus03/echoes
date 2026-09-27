@@ -49,6 +49,10 @@ class Prefs(context: Context) {
         get() = sp.getString("lastDownloadFolder", null)
         set(value) = sp.edit().putString("lastDownloadFolder", value).apply()
 
+    var shortcutName: String?
+        get() = sp.getString("shortcutName", null)
+        set(value) = sp.edit().putString("shortcutName", value).apply()
+
     /** Sort chosen inside each list, keyed by the list's route; survives restarts. */
     fun sortFor(key: String): String? = sp.getString("sort:$key", null)
     fun setSortFor(key: String, sort: String) = sp.edit().putString("sort:$key", sort).apply()

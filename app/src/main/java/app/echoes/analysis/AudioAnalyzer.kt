@@ -99,11 +99,30 @@ object AudioAnalyzer {
             loudnessLufs = lufs.toFloat(),
             peakDb = (20 * log10(max(peak, 1e-6f).toDouble())).toFloat(),
             introMs = head.leadingSilenceMs(),
-            outroMs = tail.trailingSilenceMs(),
+            outroMs = outroMs(dec, durUs, tail),
             energy = energy.toFloat().coerceIn(0f, 1f),
             bpm = bpm.toFloat(),
             envelope = envelope,
         )
+    }
+
+    /**
+     * Trailing silence can outlast the tail window (a long silent gap before a hidden track, or
+     * just padding), so while a window is all silence keep reading further back, up to half the song.
+     */
+    private fun outroMs(dec: Decoder, durUs: Long, tail: Meter): Long {
+        var meter = tail
+        var end = durUs
+        var start = max(0, durUs - TAIL_US)
+        while (true) {
+            meter.trailingSilentBlocks()?.let { blocks ->
+                return ((durUs - end) / 1000 + blocks * 100L).takeIf { it >= 400 } ?: 0
+            }
+            if (start == 0L || durUs - start >= durUs / 2) return 0
+            end = start
+            start = max(0, end - TAIL_US)
+            meter = Meter(dec.sampleRate, dec.stereo).also { dec.read(start, end, it::push) }
+        }
     }
 
     private class Decoder(private val ex: MediaExtractor, private val codec: MediaCodec, format: MediaFormat) {
@@ -307,10 +326,11 @@ object AudioAnalyzer {
             return ((first - 1) * 100L).coerceAtLeast(0).takeIf { it >= 400 } ?: 0
         }
 
-        fun trailingSilenceMs(): Long {
+        /** 100 ms blocks of silence at the end, or null when the whole region is silent. */
+        fun trailingSilentBlocks(): Int? {
             val b = regions.last().rawBlocks
-            val last = (b.size - 1 downTo 0).firstOrNull { b[it] > silent } ?: return 0
-            return ((b.size - 2 - last) * 100L).coerceAtLeast(0).takeIf { it >= 400 } ?: 0
+            val last = (b.size - 1 downTo 0).firstOrNull { b[it] > silent } ?: return null
+            return (b.size - 2 - last).coerceAtLeast(0)
         }
 
         fun brightness(): Double = regions.sumOf { it.hopHi.sum() } / max(regions.sumOf { it.hopAll.sum() }, 1e-12)
