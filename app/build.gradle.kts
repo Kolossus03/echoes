@@ -44,8 +44,10 @@ android {
             manifestPlaceholders["appName"] = "Echoes"
             resValue("string", "app_name", "Echoes")
             buildConfigField("String", "UPDATE_REPO", "\"Kolossus03/echoes\"")
+            buildConfigField("String", "MUSIC_DIR", "\"Echoes\"")
         }
-        // A private edition installed next to the base one, with its own name and (in src/personal/res) icon.
+        // A private edition installed next to the base one, with its own name, music folder and, in
+        // src/personal/res, icon and optional startup intro (drawable intro_image, raw intro_sound).
         if (personal != null) create("personal") {
             dimension = "edition"
             applicationIdSuffix = ".personal"
@@ -53,6 +55,7 @@ android {
             manifestPlaceholders["appName"] = name
             resValue("string", "app_name", name)
             buildConfigField("String", "UPDATE_REPO", "\"\"")
+            buildConfigField("String", "MUSIC_DIR", "\"${personal.getProperty("musicDir", "Echoes")}\"")
         }
     }
 

@@ -3,18 +3,19 @@ package app.echoes.library
 import android.content.ContentValues
 import android.content.Context
 import android.provider.MediaStore
+import app.echoes.BuildConfig
 import java.io.File
 import java.io.OutputStream
 
 /**
  * The one way Echoes adds music: through MediaStore, so no storage permission is needed and
  * the file shows up in the library by itself. Existing lists keep their folder; a new name
- * becomes Music/Echoes/<name>/.
+ * becomes Music/<MUSIC_DIR>/<name>/.
  */
 object MediaStoreWriter {
     fun targetFolder(lib: Library, target: String): String {
         val existing = lib.allFolders.firstOrNull { it.relPath == target || fold(it.name) == fold(target) }
-        return existing?.relPath ?: "Music/Echoes/${safeName(target)}/"
+        return existing?.relPath ?: "Music/${BuildConfig.MUSIC_DIR}/${safeName(target)}/"
     }
 
     fun exists(lib: Library, relPath: String, fileName: String): Boolean =

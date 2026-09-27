@@ -97,6 +97,7 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalNav provides nav, LocalPlayer provides player, LocalActions provides actions) {
                     Gate()
                 }
+                Intro()
             }
         }
     }
