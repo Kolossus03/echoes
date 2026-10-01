@@ -297,7 +297,7 @@ fun NowPlaying(lib: Library) {
         Spacer(Modifier.height(14.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (analysis != null) {
-                val gain = if (normalize) (-14f - analysis.loudnessLufs).coerceIn(-15f, 8f) else 0f
+                val gain = if (normalize) analysis.levelGainDb else 0f
                 Pill("${analysis.bpm.roundToInt()} BPM", color = Color.White.copy(alpha = 0.1f))
                 Pill("${(analysis.energy * 100).roundToInt()}% energía", color = Color.White.copy(alpha = 0.1f))
                 if (normalize) Pill("%+.1f dB".format(gain), color = Color.White.copy(alpha = 0.1f))

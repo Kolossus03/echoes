@@ -117,7 +117,7 @@ fun SettingsScreen(lib: Library) {
         item {
             Toggle(
                 Graph.prefs.normalize, "Volumen uniforme",
-                "Cada canción se mide (LUFS) y se ajusta a -14 LUFS: ni sustos con las que vienen altas ni subir el volumen con las flojas.",
+                "Cada canción se mide (LUFS) y se ajusta a -10 LUFS: ni sustos con las que vienen altas ni subir el volumen con las flojas.",
             )
         }
         item {

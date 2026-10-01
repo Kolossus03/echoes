@@ -39,8 +39,6 @@ import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.launch
 import kotlin.math.pow
 
-private const val TARGET_LUFS = -14f
-
 class PlaybackService : MediaLibraryService() {
     private val scope = MainScope()
     private lateinit var player: ExoPlayer
@@ -150,7 +148,7 @@ class PlaybackService : MediaLibraryService() {
     /** Quiet tracks are lifted with LoudnessEnhancer, loud ones attenuated; both toward one target. */
     private fun applyGain() {
         val a = currentTrack()?.let { Graph.analysis.current(it) }
-        val gainDb = if (Graph.prefs.normalize.value && a != null) (TARGET_LUFS - a.loudnessLufs).coerceIn(-15f, 8f) else 0f
+        val gainDb = if (Graph.prefs.normalize.value && a != null) a.levelGainDb else 0f
         player.volume = if (gainDb < 0) 10f.pow(gainDb / 20f) else 1f
         enhancer?.runCatching {
             setTargetGain(if (gainDb > 0) (gainDb * 100).toInt() else 0)

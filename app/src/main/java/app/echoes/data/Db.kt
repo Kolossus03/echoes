@@ -38,7 +38,16 @@ class Analysis(
     /** False for files the decoder could not read; they are stored so they are not retried. */
     val usable get() = loudnessLufs > UNREADABLE + 1
 
+    /** What "Volumen uniforme" applies: cuts are plain volume, lifts go through a limiter. */
+    val levelGainDb get() = (TARGET_LUFS - loudnessLufs).coerceIn(-15f, 8f)
+
     companion object {
+        /**
+         * Commercial pop and rock masters sit around -9 LUFS. Streaming's -14 cut most songs by
+         * ~5 dB and the whole library sounded quiet, so the target is close to them instead.
+         */
+        const val TARGET_LUFS = -10f
+
         /** SQLite stores NaN as NULL, so "unreadable" is a sentinel far below any real loudness. */
         const val UNREADABLE = -999f
     }
