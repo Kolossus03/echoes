@@ -37,6 +37,8 @@ import app.echoes.ui.MusicHelp
 import app.echoes.ui.Route
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AddCircleOutline
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -82,8 +84,12 @@ import app.echoes.download.LinkedPlaylist
 import app.echoes.download.Links
 import app.echoes.download.Origin
 import app.echoes.download.Spotify
+import app.echoes.download.VideoRef
+import app.echoes.download.Wanted
 import app.echoes.download.YouTube
 import app.echoes.library.Library
+import app.echoes.library.fold
+import app.echoes.library.primaryArtist
 import app.echoes.ui.LocalActions
 import app.echoes.ui.LocalNav
 import app.echoes.ui.Palette
@@ -98,8 +104,10 @@ import kotlinx.coroutines.withContext
 
 private sealed interface Preview {
     data object Empty : Preview
-    data object Loading : Preview
+    data class Loading(val label: String) : Preview
     data class Ready(val resolved: Resolved) : Preview
+    /** Typed text instead of a link: YouTube Music results to pick from. */
+    data class Results(val hits: List<VideoRef>) : Preview
     data class Error(val message: String) : Preview
 }
 
@@ -116,6 +124,7 @@ fun DownloadScreen(lib: Library) {
     val jobs by Graph.downloads.jobs.collectAsState()
     val linked by Graph.prefs.linkedFlow.collectAsState()
     var linkIt by rememberSaveable { mutableStateOf(true) }
+    var picked by remember { mutableStateOf(emptyList<VideoRef>()) }
     val scope = rememberCoroutineScope()
     val actions = LocalActions.current
 
@@ -125,12 +134,21 @@ fun DownloadScreen(lib: Library) {
             if ((preview as? Preview.Ready)?.resolved?.origin != Origin.FILE) preview = Preview.Empty
             return@LaunchedEffect
         }
+        picked = emptyList()
         if (!Links.looksLikeLink(text)) {
-            preview = Preview.Error("Pega un enlace de YouTube o de Spotify")
+            val query = text.trim()
+            if (query.length < 2) {
+                preview = Preview.Empty
+                return@LaunchedEffect
+            }
+            delay(500)
+            preview = Preview.Loading("Buscando…")
+            preview = runCatching { Graph.downloads.search(query) }
+                .fold({ if (it.isEmpty()) Preview.Error("Nada en YouTube para «$query»") else Preview.Results(it.take(12)) }, { Preview.Error("No se pudo buscar: ${it.message ?: "error"}") })
             return@LaunchedEffect
         }
         delay(300)
-        preview = Preview.Loading
+        preview = Preview.Loading("Leyendo enlace…")
         preview = runCatching { Graph.downloads.resolve(text) }
             .fold({ Preview.Ready(it) }, { Preview.Error("No se pudo leer el enlace: ${it.message ?: "error"}") })
     }
@@ -138,7 +156,7 @@ fun DownloadScreen(lib: Library) {
     LaunchedEffect(nav.sharedFile) {
         val uri = nav.sharedFile ?: return@LaunchedEffect
         text = ""
-        preview = Preview.Loading
+        preview = Preview.Loading("Leyendo archivo…")
         preview = runCatching {
             val (name, body) = withContext(Dispatchers.IO) { readFile(context, uri) }
             Graph.downloads.importCsv(name, body)
@@ -146,11 +164,13 @@ fun DownloadScreen(lib: Library) {
         // Cleared only now: clearing it first would restart this effect and cancel the import.
         nav.sharedFile = null
     }
-    val ready = preview as? Preview.Ready
+    val ready = (preview as? Preview.Ready)?.resolved
+        ?: picked.takeIf { it.isNotEmpty() && preview is Preview.Results }?.let { Resolved(it.map(Wanted::Video), null, Origin.YOUTUBE, "") }
     var help by remember { mutableStateOf(false) }
     if (help) MusicHelp(onDismiss = { help = false }, onPortal = { help = false; nav.go(Route.Settings) })
     val newList = target.isEmpty()
-    val folder = if (newList) newName.trim().ifBlank { ready?.resolved?.playlistTitle ?: "" } else target
+    val folder = if (newList) newName.trim().ifBlank { ready?.playlistTitle ?: "" } else target
+    val owned = remember(lib) { lib.allTracks.mapTo(HashSet()) { songKey(it.title, it.artist) } }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = screenPadding) {
         item {
@@ -160,13 +180,14 @@ fun DownloadScreen(lib: Library) {
                 IconButton(onClick = { help = true }) { Icon(Icons.Outlined.Info, "Cómo meter música", tint = Palette.muted) }
             }
             Text(
-                "Canciones, álbumes o playlists de YouTube y Spotify. También puedes compartir desde sus apps → ${stringResource(R.string.app_name)}.",
+                "Busca una canción en YouTube Music o pega un enlace de YouTube o Spotify. También puedes compartir desde sus apps → ${stringResource(R.string.app_name)}.",
                 color = Palette.muted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 20.dp),
             )
             Spacer(Modifier.height(14.dp))
             TextField(
                 value = text, onValueChange = { text = it }, singleLine = true,
-                placeholder = { Text("Enlace de YouTube o Spotify") },
+                placeholder = { Text("Canción, artista o enlace") },
+                leadingIcon = { Icon(Icons.Rounded.Search, null) },
                 trailingIcon = {
                     IconButton(onClick = {
                         val clip = (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).primaryClip
@@ -200,13 +221,22 @@ fun DownloadScreen(lib: Library) {
         item {
             when (val p = preview) {
                 Preview.Empty -> {}
-                Preview.Loading -> Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                is Preview.Loading -> Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(20.dp), color = Palette.mint, strokeWidth = 2.dp)
                     Spacer(Modifier.width(12.dp))
-                    Text("Leyendo enlace…", color = Palette.muted)
+                    Text(p.label, color = Palette.muted)
                 }
                 is Preview.Error -> Text(p.message, color = Palette.pink, modifier = Modifier.padding(20.dp))
                 is Preview.Ready -> PreviewCard(p.resolved)
+                is Preview.Results -> Spacer(Modifier.height(8.dp))
+            }
+        }
+        (preview as? Preview.Results)?.let { r ->
+            items(r.hits, key = { it.id }) { hit ->
+                val on = hit in picked
+                HitRow(hit, on, have = songKey(hit.title, hit.uploader.removeSuffix(" - Topic")) in owned) {
+                    picked = if (on) picked - hit else picked + hit
+                }
             }
         }
         if (ready != null) {
@@ -234,7 +264,7 @@ fun DownloadScreen(lib: Library) {
                 item {
                     TextField(
                         value = newName, onValueChange = { newName = it }, singleLine = true,
-                        placeholder = { Text(ready.resolved.playlistTitle ?: "Nombre de la lista") },
+                        placeholder = { Text(ready.playlistTitle ?: "Nombre de la lista") },
                         shape = RoundedCornerShape(14.dp),
                         colors = TextFieldDefaults.colors(
                             focusedIndicatorColor = Palette.surfaceHigh, unfocusedIndicatorColor = Palette.surfaceHigh,
@@ -244,7 +274,7 @@ fun DownloadScreen(lib: Library) {
                     )
                 }
             }
-            if (ready.resolved.playlistTitle != null && ready.resolved.origin != Origin.FILE) {
+            if (ready.playlistTitle != null && ready.origin != Origin.FILE) {
                 item {
                     Row(
                         Modifier.fillMaxWidth().clickable { linkIt = !linkIt }.padding(horizontal = 20.dp, vertical = 6.dp),
@@ -262,16 +292,17 @@ fun DownloadScreen(lib: Library) {
                 }
             }
             item {
-                val n = ready.resolved.items.size
+                val n = ready.items.size
                 Box(
                     Modifier.padding(20.dp).fillMaxWidth().clip(RoundedCornerShape(99.dp))
                         .background(if (folder.isNotBlank()) Palette.mint else Palette.surfaceHigh)
                         .then(
                             if (folder.isNotBlank()) Modifier.clickable {
                                 Graph.prefs.lastDownloadFolder = target.ifEmpty { null }
-                                Graph.downloads.enqueue(ready.resolved.items, folder)
-                                if (linkIt) Graph.downloads.link(ready.resolved, folder)
+                                Graph.downloads.enqueue(ready.items, folder)
+                                if (linkIt) Graph.downloads.link(ready, folder)
                                 preview = Preview.Empty
+                                picked = emptyList()
                                 text = ""
                             } else Modifier,
                         )
@@ -352,6 +383,37 @@ private fun PreviewCard(r: Resolved) {
                 Text("${first.artist} · ${fmtTime(first.durationSec * 1000)} · ${r.origin.label}", color = Palette.muted, style = MaterialTheme.typography.bodySmall)
             }
         }
+    }
+}
+
+/** Same normalisation as the download queue's duplicate check: main artist and title without "(…)" or " - …". */
+private fun songKey(title: String, artist: String) =
+    fold(primaryArtist(artist)) + "|" + fold(title.substringBefore(" - ").substringBefore(" (").trim())
+
+@Composable
+private fun HitRow(hit: VideoRef, picked: Boolean, have: Boolean, onClick: () -> Unit) {
+    // YouTube Music hands out 60 px covers; the URL picks the size.
+    val thumb = rememberUrlImage(hit.thumb?.replace(Regex("=w\\d+-h\\d+"), "=w180-h180"))
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Palette.surfaceHigh)) {
+            thumb?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(hit.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, color = if (have) Palette.muted else Palette.text)
+            Text(
+                listOfNotNull(hit.uploader.removeSuffix(" - Topic"), fmtTime(hit.durationSec * 1000), "Ya la tienes".takeIf { have }).joinToString(" · "),
+                color = Palette.muted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(
+            if (picked) Icons.Rounded.CheckCircle else Icons.Rounded.AddCircleOutline,
+            if (picked) "Quitar" else "Elegir",
+            tint = if (picked) Palette.mint else Palette.muted,
+        )
     }
 }
 

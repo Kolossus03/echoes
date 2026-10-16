@@ -48,6 +48,8 @@ class Downloads(private val context: Context, private val scope: CoroutineScope)
     /** Resolves a link (song, playlist or album) without downloading; used for the preview. */
     suspend fun resolve(text: String): Resolved = withContext(Dispatchers.IO) { Links.resolve(text) }
 
+    suspend fun search(query: String): List<VideoRef> = withContext(Dispatchers.IO) { YouTube.search(query) }
+
     fun enqueue(items: List<Wanted>, folder: String) {
         state.update { it + items.map { w -> DlJob(ids.incrementAndGet(), w, folder, DlState.Waiting) } }
         DownloadService.start(context)

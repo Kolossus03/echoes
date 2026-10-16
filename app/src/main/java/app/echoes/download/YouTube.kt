@@ -61,7 +61,7 @@ object YouTube {
                 items += more.items
                 page = more.nextPage
             }
-            val videos = items.map { VideoRef(yt.streamLHFactory.getId(it.url), it.url, it.name, it.uploaderName ?: "", it.duration, best(it.thumbnails)) }
+            val videos = items.map(::ref)
             return Resolved(videos.map(Wanted::Video), info.name, Origin.YOUTUBE, url)
         }
         val info = StreamInfo.getInfo(yt, url)
@@ -119,11 +119,23 @@ object YouTube {
                     score to item
                 }
                 .maxByOrNull { it.first }?.second
-                ?.let { VideoRef(yt.streamLHFactory.getId(it.url), it.url, it.name, it.uploaderName.orEmpty(), it.duration, best(it.thumbnails)) }
+                ?.let(::ref)
         }
         return runCatching { pick(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS) }.getOrNull()
             ?: runCatching { pick(YoutubeSearchQueryHandlerFactory.VIDEOS) }.getOrNull()
     }
+
+    /** Typed search: songs on YouTube Music first (clean tags, album covers), plain videos if none. */
+    fun search(query: String): List<VideoRef> {
+        fun run(filter: String) = SearchInfo.getInfo(yt, yt.searchQHFactory.fromQuery(query, listOf(filter), ""))
+            .relatedItems.filterIsInstance<StreamInfoItem>().filter { it.duration > 0 }.map(::ref).distinctBy { it.id }
+        // YouTube Music songs are "Artist - Topic" uploads; saying so lets tags() take the artist as is.
+        return run(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS).map { it.copy(uploader = it.uploader.removeSuffix(" - Topic") + " - Topic") }
+            .ifEmpty { run(YoutubeSearchQueryHandlerFactory.VIDEOS) }
+    }
+
+    private fun ref(item: StreamInfoItem) =
+        VideoRef(yt.streamLHFactory.getId(item.url), item.url, item.name, item.uploaderName.orEmpty(), item.duration, best(item.thumbnails))
 
     private fun words(s: String): Set<String> = fold(s).split(Regex("""[^\p{L}\p{N}]+""")).filter { it.length > 1 }.toSet()
 
