@@ -137,7 +137,8 @@ fun DownloadScreen(lib: Library) {
     val actions = LocalActions.current
 
     LaunchedEffect(Unit) { nav.sharedLink = null }
-    LaunchedEffect(text) {
+    var videos by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(text, videos) {
         if (text.isBlank()) {
             if ((preview as? Preview.Ready)?.resolved?.origin != Origin.FILE) preview = Preview.Empty
             return@LaunchedEffect
@@ -152,7 +153,7 @@ fun DownloadScreen(lib: Library) {
             }
             delay(500)
             preview = Preview.Loading("Buscando…")
-            preview = runCatching { Graph.downloads.search(query) }
+            preview = runCatching { Graph.downloads.search(query, videos) }
                 .fold({ if (it.isEmpty()) Preview.Error("Nada en YouTube para «$query»") else Preview.Results(it.take(12)) }, { Preview.Error("No se pudo buscar: ${it.message ?: "error"}") })
             return@LaunchedEffect
         }
@@ -227,6 +228,16 @@ fun DownloadScreen(lib: Library) {
                 )
             }
         }
+        if (text.trim().length >= 2 && !Links.looksLikeLink(text)) {
+            item {
+                Row(Modifier.padding(start = 20.dp, top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(false to "Canciones", true to "Vídeos").forEach { (v, label) ->
+                        val on = videos == v
+                        Pill(label, color = if (on) Palette.mint else Palette.surfaceHigh, textColor = if (on) Palette.bg else Palette.text) { videos = v }
+                    }
+                }
+            }
+        }
         item {
             when (val p = preview) {
                 Preview.Empty -> {}
@@ -244,7 +255,7 @@ fun DownloadScreen(lib: Library) {
             items(r.hits, key = { it.id }) { hit ->
                 val on = hit in picked
                 HitRow(
-                    hit, on, have = songKey(hit.title, hit.uploader.removeSuffix(" - Topic")) in owned,
+                    hit, on, have = Wanted.Video(hit).let { songKey(it.title, it.artist) } in owned,
                     listening = listen.current == hit.id,
                     loading = (listen.state as? SongPreview.State.Loading)?.id == hit.id,
                     onListen = { listen.toggle(hit) },

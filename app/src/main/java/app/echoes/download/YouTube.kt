@@ -125,13 +125,17 @@ object YouTube {
             ?: runCatching { pick(YoutubeSearchQueryHandlerFactory.VIDEOS) }.getOrNull()
     }
 
-    /** Typed search: songs on YouTube Music first (clean tags, album covers), plain videos if none. */
-    fun search(query: String): List<VideoRef> {
-        fun run(filter: String) = SearchInfo.getInfo(yt, yt.searchQHFactory.fromQuery(query, listOf(filter), ""))
-            .relatedItems.filterIsInstance<StreamInfoItem>().filter { it.duration > 0 }.map(::ref).distinctBy { it.id }
+    /**
+     * Typed search. Songs: YouTube Music's "Songs" tab (clean tags, album covers), plain videos if
+     * it finds none. Videos: the same ranking as the YouTube search bar, without Shorts.
+     */
+    fun search(query: String, videos: Boolean): List<VideoRef> {
+        fun run(filters: List<String>) = SearchInfo.getInfo(yt, yt.searchQHFactory.fromQuery(query, filters, ""))
+            .relatedItems.filterIsInstance<StreamInfoItem>().filter { it.duration > 0 && !it.isShortFormContent }.map(::ref).distinctBy { it.id }
+        if (videos) return run(emptyList())
         // YouTube Music songs are "Artist - Topic" uploads; saying so lets tags() take the artist as is.
-        return run(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS).map { it.copy(uploader = it.uploader.removeSuffix(" - Topic") + " - Topic") }
-            .ifEmpty { run(YoutubeSearchQueryHandlerFactory.VIDEOS) }
+        return run(listOf(YoutubeSearchQueryHandlerFactory.MUSIC_SONGS)).map { it.copy(uploader = it.uploader.removeSuffix(" - Topic") + " - Topic") }
+            .ifEmpty { run(emptyList()) }
     }
 
     private fun ref(item: StreamInfoItem) =
