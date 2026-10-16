@@ -38,7 +38,12 @@ import app.echoes.ui.Route
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddCircleOutline
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.runtime.DisposableEffect
+import app.echoes.download.SongPreview
+import app.echoes.ui.LocalPlayer
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -126,6 +131,9 @@ fun DownloadScreen(lib: Library) {
     var linkIt by rememberSaveable { mutableStateOf(true) }
     var picked by remember { mutableStateOf(emptyList<VideoRef>()) }
     val scope = rememberCoroutineScope()
+    val player = LocalPlayer.current
+    val listen = remember { SongPreview(context, player, scope) }
+    DisposableEffect(Unit) { onDispose { listen.release() } }
     val actions = LocalActions.current
 
     LaunchedEffect(Unit) { nav.sharedLink = null }
@@ -135,6 +143,7 @@ fun DownloadScreen(lib: Library) {
             return@LaunchedEffect
         }
         picked = emptyList()
+        listen.stop()
         if (!Links.looksLikeLink(text)) {
             val query = text.trim()
             if (query.length < 2) {
@@ -234,7 +243,12 @@ fun DownloadScreen(lib: Library) {
         (preview as? Preview.Results)?.let { r ->
             items(r.hits, key = { it.id }) { hit ->
                 val on = hit in picked
-                HitRow(hit, on, have = songKey(hit.title, hit.uploader.removeSuffix(" - Topic")) in owned) {
+                HitRow(
+                    hit, on, have = songKey(hit.title, hit.uploader.removeSuffix(" - Topic")) in owned,
+                    listening = listen.current == hit.id,
+                    loading = (listen.state as? SongPreview.State.Loading)?.id == hit.id,
+                    onListen = { listen.toggle(hit) },
+                ) {
                     picked = if (on) picked - hit else picked + hit
                 }
             }
@@ -299,6 +313,7 @@ fun DownloadScreen(lib: Library) {
                         .then(
                             if (folder.isNotBlank()) Modifier.clickable {
                                 Graph.prefs.lastDownloadFolder = target.ifEmpty { null }
+                                listen.stop()
                                 Graph.downloads.enqueue(ready.items, folder)
                                 if (linkIt) Graph.downloads.link(ready, folder)
                                 preview = Preview.Empty
@@ -391,15 +406,24 @@ private fun songKey(title: String, artist: String) =
     fold(primaryArtist(artist)) + "|" + fold(title.substringBefore(" - ").substringBefore(" (").trim())
 
 @Composable
-private fun HitRow(hit: VideoRef, picked: Boolean, have: Boolean, onClick: () -> Unit) {
+private fun HitRow(hit: VideoRef, picked: Boolean, have: Boolean, listening: Boolean, loading: Boolean, onListen: () -> Unit, onClick: () -> Unit) {
     // YouTube Music hands out 60 px covers; the URL picks the size.
     val thumb = rememberUrlImage(hit.thumb?.replace(Regex("=w\\d+-h\\d+"), "=w180-h180"))
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Palette.surfaceHigh)) {
+        Box(
+            Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Palette.surfaceHigh).clickable(onClick = onListen),
+            contentAlignment = Alignment.Center,
+        ) {
             thumb?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+            Box(Modifier.fillMaxSize().background(Palette.bg.copy(alpha = if (listening) 0.6f else 0.3f)))
+            when {
+                loading -> CircularProgressIndicator(Modifier.size(20.dp), color = Palette.mint, strokeWidth = 2.dp)
+                listening -> Icon(Icons.Rounded.Stop, "Parar", tint = Palette.mint)
+                else -> Icon(Icons.Rounded.PlayArrow, "Escuchar un trozo", tint = Palette.text)
+            }
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {

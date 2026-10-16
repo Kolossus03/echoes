@@ -171,12 +171,9 @@ object YouTube {
             c.readTimeout = 30_000
             c.requestMethod = "POST"
             c.doOutput = true
-            c.setRequestProperty("User-Agent", if (YoutubeParsingHelper.isVisionOsStreamingUrl(url)) YoutubeParsingHelper.getVisionOsUserAgent(null) else UA)
+            c.setRequestProperty("User-Agent", userAgent(url))
             c.setRequestProperty("Accept-Encoding", "identity")
-            if (YoutubeParsingHelper.isWebStreamingUrl(url)) {
-                c.setRequestProperty("Origin", "https://www.youtube.com")
-                c.setRequestProperty("Referer", "https://www.youtube.com")
-            }
+            headers(url).forEach { (k, v) -> c.setRequestProperty(k, v) }
             c.setFixedLengthStreamingMode(2)
             c.outputStream.use { it.write(byteArrayOf(0x78, 0)) }
             val code = c.responseCode
@@ -197,6 +194,13 @@ object YouTube {
         }
         if (pos == 0L) error("descarga vacía")
     }
+
+    /** Stream URLs only answer requests that look like the client they were issued to. */
+    fun userAgent(streamUrl: String): String =
+        if (YoutubeParsingHelper.isVisionOsStreamingUrl(streamUrl)) YoutubeParsingHelper.getVisionOsUserAgent(null) else UA
+
+    fun headers(streamUrl: String): Map<String, String> =
+        if (YoutubeParsingHelper.isWebStreamingUrl(streamUrl)) mapOf("Origin" to "https://www.youtube.com", "Referer" to "https://www.youtube.com") else emptyMap()
 
     private object Http : Downloader() {
         override fun execute(request: Request): Response {
