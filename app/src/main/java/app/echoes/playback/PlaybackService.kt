@@ -161,7 +161,7 @@ class PlaybackService : MediaLibraryService() {
         val idx = player.currentMediaItemIndex
         listOf(idx, idx + 1).filter { it in 0 until player.mediaItemCount }.forEach { i ->
             val t = lib.byId[player.getMediaItemAt(i).mediaId.toLongOrNull()] ?: return@forEach
-            if (Graph.analysis.current(t) == null) scope.launch { Graph.analysis.analyze(t) }
+            if (Graph.analysis.current(t) == null) scope.launch { Graph.analysis.analyzeNow(t) }
         }
     }
 

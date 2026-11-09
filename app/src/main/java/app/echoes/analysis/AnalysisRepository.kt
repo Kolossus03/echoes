@@ -12,30 +12,52 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 data class AnalysisProgress(val done: Int, val total: Int)
 
 class AnalysisRepository(private val context: Context, private val dao: EchoesDao, private val scope: CoroutineScope) {
-    val byPath: StateFlow<Map<String, Analysis>> =
-        dao.analysis().map { list -> list.associateBy { it.path } }.stateIn(scope, SharingStarted.Eagerly, emptyMap())
+    private val inFlight = ConcurrentHashMap.newKeySet<String>()
+    private val neededByPlayer = ConcurrentHashMap.newKeySet<String>()
+    private val publishNow = Channel<Unit>(Channel.CONFLATED)
+
+    /**
+     * Every upsert reloads the whole table, so after each load Room is held back for a while:
+     * a backlog publishes every few seconds instead of once per song. Songs the player is
+     * waiting for cut the wait short.
+     */
+    val byPath: StateFlow<Map<String, Analysis>> = dao.analysis()
+        .transform { list ->
+            emit(list.associateBy { it.path })
+            withTimeoutOrNull(PUBLISH_EVERY_MS) { publishNow.receive() }
+        }
+        .flowOn(Dispatchers.Default)
+        .stateIn(scope, SharingStarted.Eagerly, emptyMap())
 
     val progress = MutableStateFlow<AnalysisProgress?>(null)
-    private val inFlight = ConcurrentHashMap.newKeySet<String>()
 
     fun current(track: Track): Analysis? = byPath.value[track.path]?.takeIf { it.fingerprint == track.fingerprint && it.usable }
+
+    /** For the songs the player needs next: their result reaches [byPath] at once, even if the backlog is the one measuring them. */
+    suspend fun analyzeNow(track: Track) {
+        neededByPlayer += track.path
+        analyze(track)
+    }
 
     /** Unreadable files are stored too (see [Analysis.usable]) so they are not retried on every pass. */
     suspend fun analyze(track: Track): Analysis? {
@@ -60,6 +82,7 @@ class AnalysisRepository(private val context: Context, private val dao: EchoesDa
                 analyzedAt = System.currentTimeMillis(),
             )
             dao.upsertAnalysis(row)
+            if (neededByPlayer.remove(track.path)) publishNow.trySend(Unit)
             Log.i("Echoes", "analyzed ${track.title}: ${row.loudnessLufs} LUFS, ${row.bpm} bpm, e=${row.energy}, in=${row.introMs} out=${row.outroMs} (${System.currentTimeMillis() - started} ms)")
             return row
         } finally {
@@ -76,14 +99,17 @@ class AnalysisRepository(private val context: Context, private val dao: EchoesDa
             val done = AtomicInteger(0)
             progress.value = AnalysisProgress(0, todo.size)
             val gate = Semaphore(4)
-            coroutineScope {
+            val measured = coroutineScope {
                 todo.map { t ->
                     async {
-                        gate.withPermit { analyze(t) }
+                        val row = gate.withPermit { analyze(t) }
                         progress.value = AnalysisProgress(done.incrementAndGet(), todo.size)
+                        row != null
                     }
                 }.awaitAll()
             }
+            // Whatever was skipped is already being measured for the player, which stores it.
+            if (measured.none { it }) break
         }
         progress.value = null
     }
@@ -94,5 +120,9 @@ class AnalysisRepository(private val context: Context, private val dao: EchoesDa
     fun schedule() {
         if (backlog?.isActive == true) return
         backlog = scope.launch(Dispatchers.Default) { analyzeBacklog() }
+    }
+
+    private companion object {
+        const val PUBLISH_EVERY_MS = 5_000L
     }
 }
