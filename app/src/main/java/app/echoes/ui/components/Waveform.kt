@@ -20,6 +20,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import app.echoes.data.Analysis
@@ -35,14 +36,13 @@ fun WaveformSeekBar(
     analysis: Analysis?,
     trimmed: Boolean,
     trackDurationMs: Long,
-    progress: Float,
+    progress: () -> Float,
     accent: Color,
     onSeek: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var drag by remember { mutableStateOf<Float?>(null) }
     val bars = remember(analysis, trimmed, trackDurationMs) { bars(analysis, trimmed, trackDurationMs) }
-    val shown = drag ?: progress
     Canvas(
         modifier.fillMaxWidth().height(56.dp)
             .pointerInput(Unit) { detectTapGestures { onSeek((it.x / size.width).coerceIn(0f, 1f)) } }
@@ -54,6 +54,7 @@ fun WaveformSeekBar(
                 ) { change, _ -> drag = (change.position.x / size.width).coerceIn(0f, 1f) }
             },
     ) {
+        val shown = drag ?: progress()
         val n = bars.size
         val slot = size.width / n
         val w = max(1.5f, slot * 0.58f)
@@ -96,15 +97,22 @@ private fun bars(analysis: Analysis?, trimmed: Boolean, durationMs: Long): Float
 
 @Composable
 fun EqBars(playing: Boolean, modifier: Modifier = Modifier, color: Color = app.echoes.ui.Palette.mint) {
+    if (playing) MovingEqBars(modifier, color) else Canvas(modifier) { drawEqBars(color) { 0.3f } }
+}
+
+@Composable
+private fun MovingEqBars(modifier: Modifier, color: Color) {
     val t = rememberInfiniteTransition(label = "eq")
     val phases = listOf(420, 530, 380).map { d ->
         t.animateFloat(0.25f, 1f, infiniteRepeatable(tween(d), RepeatMode.Reverse), label = "bar$d")
     }
-    Canvas(modifier) {
-        val w = size.width / 5
-        phases.forEachIndexed { i, p ->
-            val h = size.height * (if (playing) p.value else 0.3f)
-            drawRoundRect(color, Offset(w * (i * 2), size.height - h), Size(w, h), CornerRadius(w / 2))
-        }
+    Canvas(modifier) { drawEqBars(color) { phases[it].value } }
+}
+
+private fun DrawScope.drawEqBars(color: Color, level: (Int) -> Float) {
+    val w = size.width / 5
+    for (i in 0 until 3) {
+        val h = size.height * level(i)
+        drawRoundRect(color, Offset(w * (i * 2), size.height - h), Size(w, h), CornerRadius(w / 2))
     }
 }

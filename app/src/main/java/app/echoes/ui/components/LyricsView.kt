@@ -14,8 +14,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -30,11 +33,11 @@ import app.echoes.lyrics.LyricsState
 
 /**
  * The song's lyrics in place of the artwork. Synced lyrics follow the song: the sung line is
- * lit and kept a third of the way down; tapping a line jumps there. [positionMs] is the time in
+ * lit and kept a third of the way down; tapping a line jumps there. [position] is the time in
  * the file, not in the (possibly silence-trimmed) playback.
  */
 @Composable
-fun LyricsView(track: Track, positionMs: Long, accent: Color, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
+fun LyricsView(track: Track, position: () -> Long, accent: Color, onSeek: (Long) -> Unit, modifier: Modifier = Modifier) {
     val state by produceState<LyricsState>(LyricsState.Loading, track.path) { value = Graph.lyrics.load(track) }
     Box(modifier.clipToBounds(), contentAlignment = Alignment.Center) {
         when (val s = state) {
@@ -44,14 +47,15 @@ fun LyricsView(track: Track, positionMs: Long, accent: Color, onSeek: (Long) -> 
             is LyricsState.Plain -> LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(vertical = 24.dp)) {
                 itemsIndexed(s.lines) { _, line -> LyricLine(line, Color.White.copy(alpha = 0.85f)) }
             }
-            is LyricsState.Synced -> Synced(s, positionMs, accent, onSeek)
+            is LyricsState.Synced -> Synced(s, position, accent, onSeek)
         }
     }
 }
 
 @Composable
-private fun Synced(s: LyricsState.Synced, positionMs: Long, accent: Color, onSeek: (Long) -> Unit) {
-    val current = s.lines.indexOfLast { it.ms <= positionMs + 250 }
+private fun Synced(s: LyricsState.Synced, position: () -> Long, accent: Color, onSeek: (Long) -> Unit) {
+    val latest by rememberUpdatedState(position)
+    val current by remember(s) { derivedStateOf { latest().let { p -> s.lines.indexOfLast { it.ms <= p + 250 } } } }
     val list = rememberLazyListState()
     val offset = with(LocalDensity.current) { 110.dp.roundToPx() }
     LaunchedEffect(current) {

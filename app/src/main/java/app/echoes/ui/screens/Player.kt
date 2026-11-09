@@ -54,7 +54,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.LongState
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableFloatStateOf
@@ -66,7 +68,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
@@ -95,18 +99,37 @@ import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+/** Read `longValue` only in the piece that shows it, so the rest of the screen stays still. */
 @Composable
-private fun rememberPosition(): Long {
+private fun rememberPosition(active: Boolean): LongState {
     val player = LocalPlayer.current
     val ui by player.ui.collectAsState()
-    var pos by remember { mutableLongStateOf(player.positionMs) }
-    LaunchedEffect(ui.isPlaying, ui.currentId) {
+    val pos = remember { mutableLongStateOf(player.positionMs) }
+    LaunchedEffect(ui.isPlaying, ui.currentId, active) {
+        if (!active) return@LaunchedEffect
         do {
-            pos = player.positionMs
+            pos.longValue = player.positionMs
             delay(250)
         } while (ui.isPlaying)
     }
     return pos
+}
+
+@Composable
+private fun MiniProgress(durationMs: Long, active: Boolean) {
+    val pos = rememberPosition(active)
+    Box(
+        Modifier.fillMaxWidth().height(2.dp).background(Color.White.copy(alpha = 0.15f)).drawBehind {
+            val fraction = if (durationMs > 0) (pos.longValue.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+            drawRect(Color.White, size = Size(size.width * fraction, size.height))
+        },
+    )
+}
+
+@Composable
+private fun PositionLabel(pos: LongState) {
+    val text by remember { derivedStateOf { fmtTime(pos.longValue) } }
+    Text(text, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
 }
 
 /**
@@ -124,7 +147,6 @@ fun MiniPlayer(lib: Library, modifier: Modifier = Modifier) {
     val compact = !ui.isPlaying
     val colors = rememberArtColors(track)
     val bg by animateColorAsState(colors.base, label = "mini")
-    val pos = rememberPosition()
     var dx by remember { mutableFloatStateOf(0f) }
     var dy by remember { mutableFloatStateOf(0f) }
     Column(
@@ -177,9 +199,7 @@ fun MiniPlayer(lib: Library, modifier: Modifier = Modifier) {
             }
         }
         if (!compact) {
-            Box(Modifier.fillMaxWidth().height(2.dp).background(Color.White.copy(alpha = 0.15f))) {
-                Box(Modifier.fillMaxWidth(if (ui.durationMs > 0) (pos.toFloat() / ui.durationMs).coerceIn(0f, 1f) else 0f).height(2.dp).background(Color.White))
-            }
+            MiniProgress(ui.durationMs, active = !nav.playerOpen && !nav.queueOpen)
         }
     }
 }
@@ -204,7 +224,7 @@ fun NowPlaying(lib: Library) {
     val trim by Graph.prefs.trimSilence.flow.collectAsState()
     val shuffleOn by Graph.prefs.shuffle.flow.collectAsState()
     val normalize by Graph.prefs.normalize.flow.collectAsState()
-    val pos = rememberPosition()
+    val pos = rememberPosition(active = !nav.queueOpen)
     val artScale by animateFloatAsState(if (ui.isPlaying) 1f else 0.86f, label = "art")
     var dx by remember { mutableFloatStateOf(0f) }
     var showLyrics by rememberSaveable { mutableStateOf(false) }
@@ -230,7 +250,7 @@ fun NowPlaying(lib: Library) {
             // Playback of a trimmed song starts after its leading silence; lyrics are timed from the file start.
             val clipStart = if (trim && analysis != null && (analysis.introMs > 0 || analysis.outroMs > 0)) analysis.introMs else 0L
             LyricsView(
-                track, pos + clipStart, accent, onSeek = { player.seekTo((it - clipStart).coerceAtLeast(0)) },
+                track, { pos.longValue + clipStart }, accent, onSeek = { player.seekTo((it - clipStart).coerceAtLeast(0)) },
                 Modifier.weight(1.2f).fillMaxWidth(),
             )
         } else {
@@ -265,11 +285,11 @@ fun NowPlaying(lib: Library) {
         Spacer(Modifier.height(10.dp))
         WaveformSeekBar(
             analysis = analysis, trimmed = trim, trackDurationMs = track.durationMs,
-            progress = if (ui.durationMs > 0) pos.toFloat() / ui.durationMs else 0f, accent = accent,
+            progress = { if (ui.durationMs > 0) pos.longValue.toFloat() / ui.durationMs else 0f }, accent = accent,
             onSeek = { player.seekTo((it * ui.durationMs).toLong()) },
         )
         Row {
-            Text(fmtTime(pos), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
+            PositionLabel(pos)
             Spacer(Modifier.weight(1f))
             Text(fmtTime(ui.durationMs), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f))
         }
