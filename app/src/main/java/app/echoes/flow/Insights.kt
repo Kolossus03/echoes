@@ -5,7 +5,6 @@ import app.echoes.data.Outcome
 import app.echoes.data.Play
 import app.echoes.library.Library
 import app.echoes.library.Track
-import app.echoes.library.primaryArtist
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -43,7 +42,7 @@ class Insights(plays: List<Play>, library: Library, analysis: Map<String, Analys
         library.byPath[path]?.let { Ranked(it, ps.sumOf { p -> p.listenedMs }, ps.count { p -> p.outcome == Outcome.COMPLETED }) }
     }.sortedByDescending { it.ms }.take(10)
 
-    val topArtists: List<Ranked<String>> = recent.mapNotNull { p -> library.byPath[p.path]?.let { primaryArtist(it.artist) to p } }
+    val topArtists: List<Ranked<String>> = recent.mapNotNull { p -> library.byPath[p.path]?.let { it.primaryArtist to p } }
         .groupBy({ it.first }, { it.second })
         .map { (a, ps) -> Ranked(a, ps.sumOf { it.listenedMs }, ps.count { it.outcome == Outcome.COMPLETED }) }
         .sortedByDescending { it.ms }.take(8)

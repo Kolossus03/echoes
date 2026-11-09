@@ -55,9 +55,9 @@ fun SearchScreen(lib: Library) {
     val player = LocalPlayer.current
     val songs = remember(q, lib) { lib.search(q).take(200) }
     val fq = fold(q.trim())
-    val artists = remember(q, lib) { if (fq.length < 2) emptyList() else lib.artists.filter { fq in fold(it.name) }.take(10) }
-    val albums = remember(q, lib) { if (fq.length < 2) emptyList() else lib.albums.filter { fq in fold(it.title) }.take(10) }
-    val folders = remember(q, lib) { if (fq.length < 2) emptyList() else lib.folders.filter { fq in fold(it.name) } }
+    val artists = remember(q, lib) { if (fq.length < 2) emptyList() else lib.artists.filter { fq in it.foldedName }.take(10) }
+    val albums = remember(q, lib) { if (fq.length < 2) emptyList() else lib.albums.filter { fq in it.foldedTitle }.take(10) }
+    val folders = remember(q, lib) { if (fq.length < 2) emptyList() else lib.folders.filter { fq in it.foldedName } }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = screenPadding) {
         item {

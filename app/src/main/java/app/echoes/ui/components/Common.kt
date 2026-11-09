@@ -50,7 +50,6 @@ import androidx.compose.ui.unit.dp
 import app.echoes.Graph
 import app.echoes.library.Track
 import app.echoes.library.fold
-import app.echoes.library.primaryArtist
 import app.echoes.ui.LocalActions
 import app.echoes.ui.LocalNav
 import app.echoes.ui.LocalPlayer
@@ -139,8 +138,8 @@ fun TrackMenu(track: Track) {
             item("Añadir a la cola", Icons.AutoMirrored.Rounded.QueueMusic) { player.enqueue(track); actions.toast("En la cola") }
             item(if (fav) "Quitar de favoritas" else "Favorita", if (fav) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder) { Graph.toggleFavorite(track.path) }
             item("Añadir a playlist", Icons.AutoMirrored.Rounded.PlaylistAdd) { actions.addingToPlaylist = listOf(track) }
-            item("Ir al artista", Icons.Rounded.Person) { nav.go(Route.Artist(primaryArtist(track.artist))) }
-            item("Ir al álbum", Icons.Rounded.Album) { nav.go(Route.Album(fold(track.album) + "|" + fold(primaryArtist(track.artist)))) }
+            item("Ir al artista", Icons.Rounded.Person) { nav.go(Route.Artist(track.primaryArtist)) }
+            item("Ir al álbum", Icons.Rounded.Album) { nav.go(Route.Album(fold(track.album) + "|" + fold(track.primaryArtist))) }
             item("Arreglar etiquetas", Icons.Rounded.Edit) { actions.editing = track }
             item("Eliminar del móvil", Icons.Rounded.Delete) { actions.delete(listOf(track)) }
         }

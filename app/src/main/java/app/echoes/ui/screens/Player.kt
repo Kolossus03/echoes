@@ -81,7 +81,6 @@ import app.echoes.ui.components.LyricsView
 import app.echoes.SleepTimer
 import app.echoes.library.Library
 import app.echoes.library.Track
-import app.echoes.library.primaryArtist
 import app.echoes.ui.LocalNav
 import app.echoes.ui.LocalPlayer
 import app.echoes.ui.Palette
@@ -255,7 +254,7 @@ fun NowPlaying(lib: Library) {
                 Text(track.title, style = MaterialTheme.typography.headlineSmall, maxLines = 1, modifier = Modifier.basicMarquee())
                 Text(
                     track.artist, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.7f), maxLines = 1,
-                    modifier = Modifier.clickable { nav.go(Route.Artist(primaryArtist(track.artist))) },
+                    modifier = Modifier.clickable { nav.go(Route.Artist(track.primaryArtist)) },
                 )
             }
             val fav = track.path in favs

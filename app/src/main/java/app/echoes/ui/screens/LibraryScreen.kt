@@ -37,7 +37,6 @@ import app.echoes.flow.foldersByRecentPlay
 import app.echoes.library.Covers
 import app.echoes.library.Library
 import app.echoes.library.Track
-import app.echoes.library.fold
 import app.echoes.ui.LocalActions
 import app.echoes.ui.LocalNav
 import app.echoes.ui.LocalPlayer
@@ -116,7 +115,7 @@ fun LibraryScreen(lib: Library) {
                 Entry(a.name, "${a.tracks.size} canciones", a.tracks) { nav.go(Route.Artist(a.name)) }
             }
             Tab.SONGS -> {
-                val sorted = lib.tracks.sortedBy { fold(it.title) }
+                val sorted = lib.tracks.sortedBy { it.foldedTitle }
                 itemsIndexed(sorted, key = { _, t -> t.id }) { i, t -> TrackRow(t, onClick = { player.play(sorted, i) }) }
             }
         }

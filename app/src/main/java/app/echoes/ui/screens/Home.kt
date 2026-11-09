@@ -50,8 +50,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.echoes.Graph
-import app.echoes.flow.buildMixes
 import app.echoes.flow.foldersByRecentPlay
 import app.echoes.library.Covers
 import app.echoes.library.Folder
@@ -75,11 +75,9 @@ import java.time.LocalTime
 fun HomeScreen(lib: Library) {
     val nav = LocalNav.current
     val taste by Graph.taste.collectAsState()
-    val analysis by Graph.analysis.byPath.collectAsState()
-    val favs by Graph.favorites.collectAsState()
     val progress by Graph.analysis.progress.collectAsState()
     val portal by PortalService.address.collectAsState()
-    val mixes = remember(lib, taste, analysis.size / 25, favs) { Graph.flowContext()?.let(::buildMixes).orEmpty() }
+    val mixes = Graph.mixes.collectAsStateWithLifecycle().value.orEmpty()
     val helpSeen by Graph.prefs.helpSeen.flow.collectAsState()
     var help by remember { mutableStateOf(false) }
     val update by Updates.available.collectAsState()

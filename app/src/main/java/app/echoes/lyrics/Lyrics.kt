@@ -3,7 +3,6 @@ package app.echoes.lyrics
 import android.content.Context
 import android.util.Log
 import app.echoes.library.Track
-import app.echoes.library.primaryArtist
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -52,7 +51,7 @@ class Lyrics(context: Context) {
 
     /** "synced\n<lrc>", "plain\n<text>" or "none": the cache format. */
     private fun fetch(track: Track): String {
-        val artist = primaryArtist(track.artist)
+        val artist = track.primaryArtist
         val title = track.title
         val seconds = track.durationMs / 1000
         val exact = get(

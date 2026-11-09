@@ -6,7 +6,6 @@ import app.echoes.data.Play
 import app.echoes.library.Folder
 import app.echoes.library.Library
 import app.echoes.library.Track
-import app.echoes.library.primaryArtist
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.min
@@ -83,7 +82,7 @@ object FlowEngine {
         var s = 0.0
         s += 2.5 * tanh(taste.transition(seed.path, c.path) / 2.0)
         s += 1.0 * tanh(taste.transition(c.path, seed.path) / 2.0)
-        if (primaryArtist(seed.artist) == primaryArtist(c.artist)) s += 1.1
+        if (seed.primaryArtist == c.primaryArtist) s += 1.1
         if (seed.folder == c.folder) s += 0.8
         if (seed.album == c.album) s += 0.3
         val a = ctx.sonic(seed)
@@ -109,12 +108,12 @@ object FlowEngine {
             val next = ctx.library.tracks.asSequence()
                 .filter { it.path !in used }
                 .maxByOrNull { c ->
-                    val artistRepeat = if (primaryArtist(c.artist) in recentArtists) 1.8 else 0.0
+                    val artistRepeat = if (c.primaryArtist in recentArtists) 1.8 else 0.0
                     score(ctx, current, c, rnd) - artistRepeat
                 } ?: return out
             out += next
             used += next.path
-            recentArtists.addLast(primaryArtist(next.artist))
+            recentArtists.addLast(next.primaryArtist)
             if (recentArtists.size > 2) recentArtists.removeFirst()
             current = next
         }

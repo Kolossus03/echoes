@@ -99,7 +99,7 @@ class Downloads(private val context: Context, private val scope: CoroutineScope)
     private fun alreadyInFolder(lib: Library, relPath: String, title: String, artist: String): Boolean {
         val t = fold(title.substringBefore(" - ").substringBefore(" (").trim())
         val a = fold(primaryArtist(artist))
-        return lib.allTracks.any { it.folder == relPath && fold(it.title.substringBefore(" - ").substringBefore(" (").trim()) == t && fold(primaryArtist(it.artist)) == a }
+        return lib.allTracks.any { it.folder == relPath && fold(it.title.substringBefore(" - ").substringBefore(" (").trim()) == t && fold(it.primaryArtist) == a }
     }
 
     private suspend fun download(job: DlJob): DlState {

@@ -23,16 +23,23 @@ data class Track(
     val fingerprint get() = "a3:$size:$modified"
     val mediaId get() = id.toString()
     val searchKey: String by lazy { fold("$title $artist $album ${folder.trimEnd('/').substringAfterLast('/')}") }
+    val primaryArtist: String by lazy { primaryArtist(artist) }
+    val foldedTitle: String by lazy { fold(title) }
+    val foldedArtist: String by lazy { fold(artist) }
 }
 
 data class Folder(val relPath: String, val name: String, val tracks: List<Track>, val hidden: Boolean) {
     val durationMs get() = tracks.sumOf { it.durationMs }
+    val foldedName: String by lazy { fold(name) }
 }
 
-data class Album(val key: String, val title: String, val artist: String, val tracks: List<Track>)
+data class Album(val key: String, val title: String, val artist: String, val tracks: List<Track>) {
+    val foldedTitle: String by lazy { fold(title) }
+}
 
 data class Artist(val name: String, val tracks: List<Track>) {
     val albums get() = tracks.map { it.album }.distinct().size
+    val foldedName: String by lazy { fold(name) }
 }
 
 class Library(rawTracks: List<Track>, meta: Map<String, FolderMeta>, overrides: Map<String, TagOverride>) {
@@ -50,7 +57,7 @@ class Library(rawTracks: List<Track>, meta: Map<String, FolderMeta>, overrides: 
             tracks = tracks.sortedWith(compareBy<Track> { it.trackNo.takeIf { n -> n > 0 } ?: Int.MAX_VALUE }.thenBy { it.dateAdded }),
             hidden = m?.hidden ?: isNoiseFolder(rel),
         )
-    }.sortedBy { fold(it.name) }
+    }.sortedBy { it.foldedName }
 
     val folders = allFolders.filterNot { it.hidden }
     private val hiddenFolders = allFolders.filter { it.hidden }.map { it.relPath }.toSet()
@@ -61,13 +68,13 @@ class Library(rawTracks: List<Track>, meta: Map<String, FolderMeta>, overrides: 
     val byId: Map<Long, Track> = allTracks.associateBy { it.id }
     val byPath: Map<String, Track> = allTracks.associateBy { it.path }
 
-    val albums: List<Album> = tracks.groupBy { fold(it.album) + "|" + fold(primaryArtist(it.artist)) }
-        .map { (key, t) -> Album(key, t.first().album, primaryArtist(t.first().artist), t.sortedBy { it.trackNo }) }
-        .sortedBy { fold(it.title) }
+    val albums: List<Album> = tracks.groupBy { fold(it.album) + "|" + fold(it.primaryArtist) }
+        .map { (key, t) -> Album(key, t.first().album, t.first().primaryArtist, t.sortedBy { it.trackNo }) }
+        .sortedBy { it.foldedTitle }
 
-    val artists: List<Artist> = tracks.groupBy { primaryArtist(it.artist) }
-        .map { (name, t) -> Artist(name, t.sortedBy { fold(it.title) }) }
-        .sortedWith(compareByDescending<Artist> { it.tracks.size }.thenBy { fold(it.name) })
+    val artists: List<Artist> = tracks.groupBy { it.primaryArtist }
+        .map { (name, t) -> Artist(name, t.sortedBy { it.foldedTitle }) }
+        .sortedWith(compareByDescending<Artist> { it.tracks.size }.thenBy { it.foldedName })
 
     fun search(query: String): List<Track> {
         val words = fold(query).split(' ').filter { it.isNotBlank() }
@@ -81,11 +88,15 @@ class Library(rawTracks: List<Track>, meta: Map<String, FolderMeta>, overrides: 
     }
 }
 
+private val combiningMarks = Regex("""\p{M}+""")
+
+private val artistSeparators = Regex("""(?i)\s+(feat\.?|ft\.?|featuring)\s+|;|/|,\s""")
+
 fun fold(s: String): String =
-    Normalizer.normalize(s.lowercase(), Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
+    Normalizer.normalize(s.lowercase(), Normalizer.Form.NFD).replace(combiningMarks, "")
 
 fun primaryArtist(artist: String): String =
-    artist.split(Regex("(?i)\\s+(feat\\.?|ft\\.?|featuring)\\s+|;|/|,\\s")).first().trim().ifBlank { artist }
+    artist.split(artistSeparators).first().trim().ifBlank { artist }
 
 private val junk = Regex(
     """(?i)\s*[(\[](official[^)\]]*|lyrics?(\s*video)?|audio|video\s*oficial|videoclip\s*oficial|hd|hq|4k|4k remaster(ed)?|visualizer)[)\]]""",

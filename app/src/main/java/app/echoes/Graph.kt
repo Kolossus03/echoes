@@ -9,9 +9,12 @@ import app.echoes.data.Favorite
 import app.echoes.data.Prefs
 import app.echoes.download.Downloads
 import app.echoes.flow.FlowContext
+import app.echoes.flow.Mix
+import app.echoes.flow.buildMixes
 import app.echoes.flow.Taste
 import app.echoes.library.ArtLoader
 import app.echoes.library.Covers
+import app.echoes.library.Library
 import app.echoes.library.LibraryRepository
 import app.echoes.lyrics.Lyrics
 import android.util.Log
@@ -22,8 +25,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -47,6 +53,9 @@ object Graph {
     lateinit var lyrics: Lyrics; private set
     lateinit var taste: StateFlow<Taste>; private set
     lateinit var favorites: StateFlow<Set<String>>; private set
+
+    /** null until the first build finishes. */
+    lateinit var mixes: StateFlow<List<Mix>?>; private set
 
     /** A failure in background work (one bad file, one lost request) is logged, never fatal to playback. */
     val scope = CoroutineScope(
@@ -72,6 +81,24 @@ object Graph {
         }
         Updates.check(scope)
         favorites = dao.favorites().map { list -> list.map { it.path }.toSet() }.stateIn(scope, SharingStarted.Eagerly, emptySet())
+        mixes = sharedMixes()
+    }
+
+    private data class MixInputs(val library: Library, val taste: Taste, val analysedBucket: Int, val favorites: Set<String>)
+
+    /** Built off the main thread and only while a screen shows them; returning with the same inputs reuses the last result. */
+    private fun sharedMixes(): StateFlow<List<Mix>?> {
+        var last: Pair<MixInputs, List<Mix>>? = null
+        return combine(
+            library.library.filterNotNull(), taste, analysis.byPath.map { it.size / 25 }.distinctUntilChanged(), favorites,
+        ) { lib, t, bucket, favs -> MixInputs(lib, t, bucket, favs) }
+            .conflate()
+            .map { inputs ->
+                last?.takeIf { it.first == inputs }?.second
+                    ?: buildMixes(FlowContext(inputs.library, analysis.byPath.value, inputs.taste, inputs.favorites)).also { last = inputs to it }
+            }
+            .flowOn(Dispatchers.Default)
+            .stateIn(scope, SharingStarted.WhileSubscribed(5_000), null)
     }
 
     fun flowContext(): FlowContext? = library.library.value?.let {

@@ -44,15 +44,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.echoes.Graph
 import app.echoes.data.Playlist
 import app.echoes.download.Origin
-import app.echoes.flow.buildMixes
+import app.echoes.flow.Mix
 import app.echoes.library.Folder
 import app.echoes.library.Covers
 import app.echoes.library.Library
 import app.echoes.library.Track
-import app.echoes.library.fold
 import app.echoes.ui.LocalActions
 import app.echoes.ui.LocalNav
 import app.echoes.ui.LocalPlayer
@@ -81,16 +81,15 @@ private enum class Sort(val label: String) {
 }
 
 @Composable
-private fun resolve(route: Route, lib: Library): View? {
+private fun resolve(route: Route, lib: Library, mixes: List<Mix>?): View? {
     val favs by Graph.favorites.collectAsState()
     val playlists by Graph.dao.playlists().collectAsState(emptyList())
     val items by Graph.dao.playlistItems().collectAsState(emptyList())
-    val taste by Graph.taste.collectAsState()
     return when (route) {
         is Route.Folder -> lib.allFolders.firstOrNull { it.relPath == route.relPath }?.let { View(it.name, "Lista", it.tracks, folder = it) }
         is Route.Album -> lib.albums.firstOrNull { it.key == route.key }?.let { View(it.title, "Álbum · ${it.artist}", it.tracks) }
         is Route.Artist -> lib.artists.firstOrNull { it.name == route.name }?.let { View(it.name, "Artista", it.tracks) }
-        is Route.Mix -> remember(lib, taste) { Graph.flowContext()?.let(::buildMixes) }?.firstOrNull { it.id == route.id }
+        is Route.Mix -> mixes?.firstOrNull { it.id == route.id }
             ?.let { View(it.title, it.subtitle, it.tracks) }
         is Route.Playlist -> playlists.firstOrNull { it.id == route.id }?.let { p ->
             View(p.name, "Playlist", items.filter { it.playlistId == p.id }.mapNotNull { lib.byPath[it.path] }, playlist = p)
@@ -105,7 +104,9 @@ fun CollectionScreen(route: Route, lib: Library) {
     val nav = LocalNav.current
     val player = LocalPlayer.current
     val actions = LocalActions.current
-    val view = resolve(route, lib)
+    val mixes = if (route is Route.Mix) Graph.mixes.collectAsStateWithLifecycle().value else null
+    if (route is Route.Mix && mixes == null) return
+    val view = resolve(route, lib, mixes)
     if (view == null) {
         LaunchedEffect(route) { nav.back() }
         return
@@ -117,8 +118,8 @@ fun CollectionScreen(route: Route, lib: Library) {
     val tracks = remember(view.tracks, sort, analysis) {
         when (sort) {
             Sort.ORIGINAL -> view.tracks
-            Sort.TITLE -> view.tracks.sortedBy { fold(it.title) }
-            Sort.ARTIST -> view.tracks.sortedBy { fold(it.artist) }
+            Sort.TITLE -> view.tracks.sortedBy { it.foldedTitle }
+            Sort.ARTIST -> view.tracks.sortedBy { it.foldedArtist }
             Sort.RECENT -> view.tracks.sortedByDescending { it.dateAdded }
             Sort.ENERGY_UP -> view.tracks.sortedBy { analysis[it.path]?.energy ?: 2f }
             Sort.TEMPO -> view.tracks.sortedBy { analysis[it.path]?.bpm?.takeIf { b -> b > 0 } ?: 999f }

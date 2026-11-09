@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -28,7 +29,7 @@ class LibraryRepository(private val context: Context, dao: EchoesDao, private va
 
     val library: StateFlow<Library?> = combine(raw.filterNotNull(), dao.folderMeta(), dao.overrides()) { tracks, meta, ov ->
         Library(tracks, meta.associateBy { it.relPath }, ov.associateBy { it.path })
-    }.stateIn(scope, SharingStarted.Eagerly, null)
+    }.flowOn(Dispatchers.Default).stateIn(scope, SharingStarted.Eagerly, null)
 
     fun refresh() {
         if (!observing) {
