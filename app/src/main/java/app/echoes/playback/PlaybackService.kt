@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.media.audiofx.LoudnessEnhancer
+import android.util.Log
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -27,6 +28,7 @@ import app.echoes.ui.MainActivity
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -37,6 +39,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlin.math.pow
 
 class PlaybackService : MediaLibraryService() {
@@ -45,6 +48,7 @@ class PlaybackService : MediaLibraryService() {
     private lateinit var session: MediaLibrarySession
     private var enhancer: LoudnessEnhancer? = null
     private var sleepJob: Job? = null
+    private var periodicSave: Job? = null
     private val tracker = PlayTracker()
 
     /** The queue in the order it was asked for; shuffle reorders the player, this stays put. */
@@ -88,6 +92,7 @@ class PlaybackService : MediaLibraryService() {
      * never run, and a paused player's notification is a plain one that outlives the process.
      */
     override fun onTaskRemoved(rootIntent: Intent?) {
+        recordPlayBeforeDying()
         saveQueue()
         player.pause()
         removeSession(session)
@@ -96,7 +101,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     override fun onDestroy() {
-        tracker.finish(Outcome.PARTIAL)
+        recordPlayBeforeDying()
         saveQueue()
         scope.cancel()
         enhancer?.release()
@@ -104,6 +109,13 @@ class PlaybackService : MediaLibraryService() {
         player.release()
         getSystemService(NotificationManager::class.java).cancel(DefaultMediaNotificationProvider.DEFAULT_NOTIFICATION_ID)
         super.onDestroy()
+    }
+
+    /** Blocks until the row is written: a coroutine would still be queued when the process is killed. */
+    private fun recordPlayBeforeDying() {
+        val play = tracker.finish(Outcome.PARTIAL) ?: return
+        runCatching { runBlocking(Dispatchers.IO) { Graph.dao.insertPlay(play) } }
+            .onFailure { Log.w("Echoes", "could not record the last play", it) }
     }
 
     private fun library(): Library? = Graph.library.library.value
@@ -118,6 +130,7 @@ class PlaybackService : MediaLibraryService() {
     private val listener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             tracker.finish(if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO || reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) Outcome.COMPLETED else null)
+                ?.let { play -> Graph.scope.launch { Graph.dao.insertPlay(play) } }
             tracker.start(currentTrack(), player.isPlaying)
             applyGain()
             ensureAnalysed()
@@ -127,7 +140,17 @@ class PlaybackService : MediaLibraryService() {
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             if (tracker.path == null) tracker.start(currentTrack(), isPlaying) else tracker.playing(isPlaying)
-            if (!isPlaying) saveQueue()
+            periodicSave?.cancel()
+            if (isPlaying) {
+                periodicSave = scope.launch {
+                    while (true) {
+                        delay(QUEUE_SAVE_EVERY_MS)
+                        saveQueue()
+                    }
+                }
+            } else {
+                saveQueue()
+            }
         }
 
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -269,12 +292,15 @@ class PlaybackService : MediaLibraryService() {
             playingSince = if (isPlaying) now else null
         }
 
-        /** `natural` is COMPLETED when the song ran out on its own; null means the user moved on. */
-        fun finish(natural: Outcome?) {
-            val p = path ?: return
+        /**
+         * The play to store, or null if too little was heard to count. `natural` is COMPLETED when
+         * the song ran out on its own, PARTIAL when the app is closing, null when the user moved on.
+         */
+        fun finish(natural: Outcome?): Play? {
+            val p = path ?: return null
             playing(false)
             path = null
-            if (listened < 1500 && natural == null) return
+            if (listened < 1500 && natural != Outcome.COMPLETED) return null
             val threshold = minOf(durationMs / 2, 240_000L)
             val outcome = when {
                 natural != null -> natural
@@ -284,14 +310,17 @@ class PlaybackService : MediaLibraryService() {
             }
             val now = System.currentTimeMillis()
             val prev = lastPath.takeIf { now - lastEndedAt < 30 * 60_000 && startedAt - lastEndedAt < 30 * 60_000 }
-            val play = Play(
+            lastPath = p
+            lastEndedAt = now
+            return Play(
                 path = p, prevPath = prev, startedAt = startedAt, listenedMs = listened, durationMs = durationMs,
                 outcome = outcome, source = if (Graph.flowMode.value) "flow" else "queue",
             )
-            Graph.scope.launch { Graph.dao.insertPlay(play) }
-            lastPath = p
-            lastEndedAt = now
         }
+    }
+
+    private companion object {
+        const val QUEUE_SAVE_EVERY_MS = 30_000L
     }
 
     private inner class LibraryCallback : MediaLibrarySession.Callback {
