@@ -1,6 +1,7 @@
 package app.echoes.portal
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import app.echoes.Graph
 import app.echoes.data.TagOverride
@@ -20,6 +21,7 @@ import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
@@ -47,6 +49,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 
 @Serializable
 data class TrackDto(
@@ -78,6 +81,11 @@ data class TrackDto(
 
 class PortalServer(private val context: Context, private val player: PlayerConnection) {
     private var server: EmbeddedServer<*, *>? = null
+    private val requestsInProgress = AtomicInteger()
+    @Volatile private var lastRequestAt = SystemClock.elapsedRealtime()
+
+    val busy get() = requestsInProgress.get() > 0
+    val idleMs get() = SystemClock.elapsedRealtime() - lastRequestAt
 
     fun start(port: Int) {
         if (server != null) return
@@ -107,6 +115,16 @@ class PortalServer(private val context: Context, private val player: PlayerConne
     }
 
     private fun io.ktor.server.application.Application.module() {
+        intercept(ApplicationCallPipeline.Setup) {
+            requestsInProgress.incrementAndGet()
+            lastRequestAt = SystemClock.elapsedRealtime()
+            try {
+                proceed()
+            } finally {
+                requestsInProgress.decrementAndGet()
+                lastRequestAt = SystemClock.elapsedRealtime()
+            }
+        }
         install(ContentNegotiation) { json() }
         install(PartialContent)
         install(StatusPages) {

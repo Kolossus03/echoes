@@ -75,7 +75,7 @@ object Graph {
         art = ArtLoader(app, covers)
         downloads = Downloads(app, scope)
         lyrics = Lyrics(app)
-        taste = dao.recentPlays(50_000).map { Taste(it) }.stateIn(scope, SharingStarted.Eagerly, Taste(emptyList()))
+        taste = dao.recentPlays(50_000).map { Taste(it) }.flowOn(Dispatchers.Default).stateIn(scope, SharingStarted.Eagerly, Taste(emptyList()))
         scope.launch {
             library.library.filterNotNull().map { it.tracks.size }.distinctUntilChanged().collect { analysis.schedule() }
         }

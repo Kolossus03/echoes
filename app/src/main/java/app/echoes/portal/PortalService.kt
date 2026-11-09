@@ -1,5 +1,6 @@
 package app.echoes.portal
 
+import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,6 +11,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.wifi.WifiManager
 import android.os.IBinder
+import android.os.SystemClock
+import app.echoes.Graph
 import app.echoes.R
 import app.echoes.playback.PlayerConnection
 import app.echoes.ui.MainActivity
@@ -22,6 +25,7 @@ class PortalService : Service() {
     private lateinit var connection: PlayerConnection
     private lateinit var server: PortalServer
     private var wifiLock: WifiManager.WifiLock? = null
+    private val idleCheck = AlarmManager.OnAlarmListener(::checkIdle)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -29,6 +33,7 @@ class PortalService : Service() {
         super.onCreate()
         connection = PlayerConnection(this).also { it.connect() }
         server = PortalServer(this, connection)
+        armIdleCheck(IDLE_OFF_MS)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -41,7 +46,27 @@ class PortalService : Service() {
         return START_STICKY
     }
 
+    /** An alarm rather than a coroutine delay: delays don't count the time the CPU sleeps with the screen off. */
+    private fun armIdleCheck(afterMs: Long) {
+        getSystemService(AlarmManager::class.java).setWindow(
+            AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + afterMs, IDLE_WINDOW_MS, "echoes:portal-idle", idleCheck, null,
+        )
+    }
+
+    private fun checkIdle() {
+        val idle = server.idleMs
+        when {
+            server.busy || Graph.downloads.jobs.value.any { !it.finished } -> armIdleCheck(BUSY_RECHECK_MS)
+            idle < IDLE_OFF_MS -> armIdleCheck(IDLE_OFF_MS - idle)
+            else -> {
+                Graph.prefs.portalEnabled.set(false)
+                stopSelf()
+            }
+        }
+    }
+
     override fun onDestroy() {
+        getSystemService(AlarmManager::class.java).cancel(idleCheck)
         server.stop()
         connection.release()
         wifiLock?.release()
@@ -66,6 +91,9 @@ class PortalService : Service() {
         const val PORT = 8484
         private const val CHANNEL = "portal"
         private const val NOTIF_ID = 42
+        private const val IDLE_OFF_MS = 30 * 60_000L
+        private const val IDLE_WINDOW_MS = 10 * 60_000L
+        private const val BUSY_RECHECK_MS = 5 * 60_000L
         val address = MutableStateFlow<String?>(null)
 
         fun localIp(): String? = NetworkInterface.getNetworkInterfaces().toList()
