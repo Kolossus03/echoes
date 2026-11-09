@@ -189,7 +189,7 @@ class PlaybackService : MediaLibraryService() {
     }
 
     private fun extendFlow() {
-        if (!Graph.flowMode.value) return
+        if (!Graph.flowMode.value || player.mediaItemCount == 0) return
         val ctx = Graph.flowContext() ?: return
         val remaining = player.mediaItemCount - player.currentMediaItemIndex - 1
         if (remaining >= 3) return
